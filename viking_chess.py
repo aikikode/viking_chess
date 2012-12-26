@@ -32,26 +32,34 @@ COLS=9
 ##############################################################################
 class VikingChess(object):
     def __init__(self):
+        self.whiteCount = 0
         self.mainWindow = mainWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
         mainWindow.connect("delete-event", gtk.main_quit) # Prevent application hanging after closing the window
         mainWindow.set_keep_above(True)
+        mainWindow.set_title("Viking Chess")
         self.vbox = gtk.VBox()
         self.hbox = [HBox(x) for x in xrange(ROWS)]
         [self.vbox.pack_start(self.hbox[x]) for x in xrange(ROWS)]
 
+        # Place the board on the window
         self.cell = [[Cell(self, x, y) for y in xrange(ROWS)] for x in xrange(COLS)]
-
         [[self.hbox[x].pack_start(self.cell[x][y]) for y in xrange(ROWS)] for x in xrange(COLS)]
-
         mainWindow.add(self.vbox)
         self.vbox.show()
         [self.hbox[x].show() for x in xrange(ROWS)]
         [[self.cell[x][y].connect("clicked", self.buttonClicked, None) for y in xrange(ROWS)] for x in xrange(COLS)]
         [[self.cell[x][y].show() for y in xrange(ROWS)] for x in xrange(COLS)]
+
+        # Center the window
+        mainWindow.set_resizable(False)
+        width, height = mainWindow.get_size()
+        mainWindow.move((gtk.gdk.screen_width() - width) / 2, (gtk.gdk.screen_height() - height) / 2)
+
         mainWindow.show()
         self.startGame()
 
     def startGame(self):
+        self.clearAllCells()
         self.setInitialPos()
         self.selectedCell = None
         self.winner = None
@@ -79,6 +87,7 @@ class VikingChess(object):
         self.cell[8][4].setWhite()
         self.cell[8][5].setWhite()
         self.cell[7][4].setWhite()
+        self.whiteCount = 16
         # Set black
         self.cell[4][4].setBlackKing()
         self.cell[2][4].setBlack()
@@ -91,30 +100,37 @@ class VikingChess(object):
         self.cell[4][6].setBlack()
     #def setInitialPos(self)
 
-    def checkGameEnd(self):
+    def isGameOver(self):
         # Check whether the King reached the border
         for x in [0, ROWS - 1]:
-            for y in [0, COLS - 1]:
+            for y in xrange(COLS):
                 if self.cell[x][y].isBlackKing:
-                    # White win
-                    self.winner = "White"
+                    self.winner = "Black"
                     return True
-        # Now check if the king is between 4 black knights
-        for x in [self.kingX - 1, self.kingX + 1]:
-            for y in [self.kingY - 1, self.kingY + 1]:
-                if not self.cell[x][y].isWhite:
-                    return False
-        self.winner = "Black"
+        for y in [0, COLS - 1]:
+            for x in xrange(ROWS):
+                if self.cell[x][y].isBlackKing:
+                    self.winner = "Black"
+                    return True
+        # If there are no white knights left, black wins
+        if self.whiteCount <= 0:
+            self.winner = "Black"
+            return True
+        # Now check if the king is between 4 white knights or
+        # between 3 white knights and a throne
+        for (x, y) in [(self.kingX - 1, self.kingY),
+                       (self.kingX + 1, self.kingY),
+                       (self.kingX, self.kingY - 1),
+                       (self.kingX, self.kingY + 1)]:
+            if not (self.cell[x][y].isWhite or self.cell[x][y].isThrone):
+                return False
+        self.winner = "White"
         return True
-    #def checkGameEnd(self)
+    #def isGameOver(self)
 
     # Unpress all buttons except current one
-    def clearButtons(self, cellX, cellY):
-        for x in xrange(COLS):
-            for y in xrange(ROWS):
-                if not (x == cellX and y == cellY):
-                    self.cell[x][y].set_active(False)
-    #def clearButtons(self, cellX, cellY)
+    def clearAllCells(self):
+        [[self.cell[x][y].clear() for x in xrange(COLS)] for y in xrange(ROWS)]
 
     def buttonClicked(self, cell, data=None):
         if cell.get_active():
@@ -135,10 +151,27 @@ class VikingChess(object):
                     self.selectedCell.set_active(False)
                     cell.set_active(False)
                     self.selectedCell.clear()
+                    if self.selectedCell.isThrone:
+                        # The king just moved from the Throne -
+                        # set special label to indicate the Throne
+                        self.selectedCell.set_label("X")
                     self.selectedCell = None
+                    self.checkKilledKnights(cell)
                     self.whiteTurn = not self.whiteTurn
                     # Always check whether anybody won the game after each move
-                    self.checkGameEnd()
+                    if self.isGameOver():
+                        winner = self.winner
+                        winnerDialog = gtk.MessageDialog(
+                            parent = None,
+                            flags = gtk.DIALOG_DESTROY_WITH_PARENT,
+                            type = gtk.MESSAGE_INFO,
+                            buttons = gtk.BUTTONS_OK,
+                            message_format = self.winner + " wins!"
+                        )
+                        winnerDialog.set_title("Round complete!")
+                        winnerDialog.connect('response', lambda dialog, response: self.startGame())
+                        winnerDialog.run()
+                        winnerDialog.destroy()
                 else:
                     cell.set_active(False)
             #if (self.whiteTurn and cell.isWhite)...
@@ -152,7 +185,7 @@ class VikingChess(object):
         if fromCell.x != toCell.x and fromCell.y != toCell.y:
             return False
         # 2. Do not allow jumping over other knights and over (and to) the throne cell
-        if toCell.isThrone:
+        if toCell.isThrone or not toCell.isEmpty():
             return False
         if fromCell.x == toCell.x: # move along Y axis
             minY = min(fromCell.y, toCell.y)
@@ -171,6 +204,29 @@ class VikingChess(object):
             return False
         # Otherwise the move is valid
         return True
+
+    def checkKilledKnights(self, curCell):
+        # We need to check only the cross 5x5 with the center in the current cell:
+        #    X
+        #    O
+        #  XOXOX
+        #    O
+        #    X
+        # doing so we even don't need to check whose turn it was because we are checking
+        # only for knights killed by the 'attack'.
+        cell = self.cell
+        x = curCell.x
+        y = curCell.y
+        for (cx, cy) in [(x - 2, y), (x + 2, y), (x, y - 2), (x, y + 2)]:
+            if cx < 0 or cy < 0 or cx >= COLS or cy >= ROWS:
+                continue
+            (mx, my) = ((cx + x) / 2, (cy + y) / 2)
+            if curCell.isWhite and cell[cx][cy].isWhite and cell[mx][my].isBlack:
+                cell[mx][my].clear()
+            if curCell.isBlack and cell[cx][cy].isBlack and cell[mx][my].isWhite:
+                self.whiteCount -= 1
+                cell[mx][my].clear()
+    #def checkKilledKnights(self, curCell)
 #class VikingChess(object)
 
 
@@ -216,6 +272,10 @@ class Cell(gtk.ToggleButton):
     def isEmpty(self):
         return not (self.isWhite or self.isBlack or self.isBlackKing)
 
+    def setThrone(self):
+        print "setThrone"
+        self.isThrone = True
+        self.set_label("X")
 #class Cell(gtk.Button)
 
 class HBox(gtk.HBox):
