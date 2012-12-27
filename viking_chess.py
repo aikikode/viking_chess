@@ -316,6 +316,8 @@ class VikingChessBoard(object):
                         )
                         winnerDialog.set_title("Round complete!")
                         winnerDialog.connect('response', lambda dialog, response: self.startGame())
+                        winnerDialog.set_position(gtk.WIN_POS_CENTER)
+                        winnerDialog.set_keep_above(True)
                         winnerDialog.run()
                         winnerDialog.destroy()
                 else:
