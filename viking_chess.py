@@ -29,6 +29,17 @@ VERSION = "0.0.1"
 ROWS = [9, 13]
 COLS = [9, 13]
 
+GTK_COLOR_BASE = 65535
+RGB_COLOR_BASE = 255
+BUTTON_EMPTY_BG_COLOR = (215, 152, 36)
+WHITE_KNIGHT_COLOR = (240, 240, 240)
+BLACK_KNIGHT_COLOR = (50, 50, 50)
+BLACK_KING_COLOR = (10, 10, 10)
+
+def rgb_to_gtk_simple(rgb_color): return GTK_COLOR_BASE * rgb_color / RGB_COLOR_BASE
+
+def RGB_TO_GTK(rgb_color_tuple):
+    return map(rgb_to_gtk_simple, rgb_color_tuple)
 ##############################################################################
 class MainWindow(gtk.Window):
     """ Main window the user sees after application starts.
@@ -390,24 +401,28 @@ class Cell(gtk.ToggleButton):
         self.isBlack = False
         self.isBlackKing = False
         self.isThrone = False
+        self.setColor(BUTTON_EMPTY_BG_COLOR)
 
     def clear(self):
         self.set_label("")
         self.isWhite = False
         self.isBlack = False
         self.isBlackKing = False
+        self.setColor(BUTTON_EMPTY_BG_COLOR)
 
     def setWhite(self):
         self.set_label("W")
         self.isWhite = True
         self.isBlack = False
         self.isBlackKing = False
+        self.setColor(WHITE_KNIGHT_COLOR)
 
     def setBlack(self):
         self.set_label("B")
         self.isWhite = False
         self.isBlack = True
         self.isBlackKing = False
+        self.setColor(BLACK_KNIGHT_COLOR)
 
     def setBlackKing(self):
         self.set_label("BK")
@@ -416,6 +431,18 @@ class Cell(gtk.ToggleButton):
         self.isBlackKing = True
         self.mainWindow.kingX = self.x
         self.mainWindow.kingY = self.y
+        self.setColor(BLACK_KING_COLOR)
+
+    def setColor(self, newColor):
+        # Make a gdk.color
+        map = self.get_colormap()
+        gtkColor = RGB_TO_GTK(newColor)
+        color = map.alloc_color(gtkColor[0], gtkColor[1], gtkColor[2], False, True)
+        # Copy the current style and replace the background
+        style = self.get_style().copy()
+        style.bg[gtk.STATE_NORMAL] = color
+        # Set the button's style to the one you created
+        self.set_style(style)
 
     def isEmpty(self):
         return not (self.isWhite or self.isBlack or self.isBlackKing)
