@@ -26,39 +26,121 @@
 import gtk
 
 VERSION = "0.0.1"
-ROWS=9
-COLS=9
+ROWS = [9, 13]
+COLS = [9, 13]
 
 ##############################################################################
-class VikingChess(object):
+class MainWindow(gtk.Window):
+    """ Main window the user sees after application starts.
+        It should present choices to start a local game,
+        start a server or connectn to existing one """
     def __init__(self):
+        gtk.Window.__init__(self)
+        self.connect("delete-event", gtk.main_quit) # Prevent application hanging after closing the window
+        self.set_keep_above(True)
+        self.set_title("Viking Chess")
+        self.set_position(gtk.WIN_POS_CENTER)
+        self.set_resizable(False)
+
+        # Put button in HBox and put that HBox in VBox to get some space
+        btStartLocalGame = gtk.Button(label="Start Local Game")
+        btStartLocalGame.set_size_request(200, 50)
+        btStartLocalGame.connect("clicked", self.startLocalGameSetup, None)
+        hbox = gtk.HBox(True, 3)
+        hbox.pack_start(btStartLocalGame, False, False, 15)
+        vbox = gtk.VBox(False, 5)
+        vbox.pack_start(hbox, False, False, 15)
+        self.add(vbox)
+
+        # Show all controls
+        btStartLocalGame.show()
+        hbox.show()
+        vbox.show()
+    #def __init__(self)
+
+    def startLocalGameSetup(self, widget, data = None):
+        self.destroy()
+        LocalGameSetup().show()
+#class MainWindow(gtk.Window)
+
+class LocalGameSetup(gtk.Window):
+    """ Settings window shown just before game start:
+        choose game field size and other options """
+    def __init__(self):
+        gtk.Window.__init__(self)
+        self.connect("delete-event", self.startMainMenu)
+        self.set_keep_above(True)
+        self.set_title("Setup")
+        self.set_position(gtk.WIN_POS_CENTER)
+        self.set_resizable(False)
+
+        lblFieldSize = gtk.Label("Set field size:")
+        self.cboxFieldSize = gtk.combo_box_new_text()
+        self.cboxFieldSize.append_text(str(ROWS[0]) + " x " + str(ROWS[0]))
+        self.cboxFieldSize.append_text(str(ROWS[1]) + " x " + str(ROWS[1]))
+        self.cboxFieldSize.set_active(0)
+        btStartGame = gtk.Button(label="Start Game")
+        btStartGame.connect("clicked", self.startGame, None)
+        hbox = gtk.HBox(True, 3)
+        hbox.pack_start(lblFieldSize, False, False, 10)
+        hbox.pack_end(self.cboxFieldSize, False, False, 10)
+        hbox2 = gtk.HBox(True, 3)
+        hbox2.pack_start(btStartGame, False, False, 10)
+        vbox = gtk.VBox(False, 3)
+        vbox.pack_start(hbox, False, False, 5)
+        vbox.pack_end(hbox2, False, False, 5)
+        self.add(vbox)
+
+        # Show all controls
+        lblFieldSize.show()
+        self.cboxFieldSize.show()
+        btStartGame.show()
+        hbox.show()
+        hbox2.show()
+        vbox.show()
+    #def __init__(self)
+
+    def startMainMenu(self, widget, data=None):
+        self.destroy()
+        MainWindow().show()
+
+    def startGame(self, widget, data = None):
+        # Get options
+        index = self.cboxFieldSize.get_active()
+        self.destroy()
+        VikingChessBoard(index).startGame()
+
+class VikingChessBoard(object):
+    def __init__(self, gameIndex):
+        self.gameIndex = gameIndex
         self.whiteCount = 0
         self.mainWindow = mainWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        mainWindow.connect("delete-event", gtk.main_quit) # Prevent application hanging after closing the window
+        mainWindow.connect("delete-event", self.startMainMenu) # Show main menu on exit
         mainWindow.set_keep_above(True)
         mainWindow.set_title("Viking Chess")
+        mainWindow.set_resizable(False)
         self.vbox = gtk.VBox()
-        self.hbox = [HBox(x) for x in xrange(ROWS)]
-        [self.vbox.pack_start(self.hbox[x]) for x in xrange(ROWS)]
+        self.hbox = [HBox(x) for x in xrange(ROWS[self.gameIndex])]
+        [self.vbox.pack_start(self.hbox[x]) for x in xrange(ROWS[self.gameIndex])]
 
         # Place the board on the window
-        self.cell = [[Cell(self, x, y) for y in xrange(ROWS)] for x in xrange(COLS)]
-        [[self.hbox[x].pack_start(self.cell[x][y]) for y in xrange(ROWS)] for x in xrange(COLS)]
+        self.cell = [[Cell(self, x, y) for y in xrange(ROWS[self.gameIndex])] for x in xrange(COLS[self.gameIndex])]
+        [[self.hbox[x].pack_start(self.cell[x][y]) for y in xrange(ROWS[self.gameIndex])] for x in xrange(COLS[self.gameIndex])]
         mainWindow.add(self.vbox)
         self.vbox.show()
-        [self.hbox[x].show() for x in xrange(ROWS)]
-        [[self.cell[x][y].connect("clicked", self.buttonClicked, None) for y in xrange(ROWS)] for x in xrange(COLS)]
-        [[self.cell[x][y].show() for y in xrange(ROWS)] for x in xrange(COLS)]
+        [self.hbox[x].show() for x in xrange(ROWS[self.gameIndex])]
+        [[self.cell[x][y].connect("clicked", self.buttonClicked, None) for y in xrange(ROWS[self.gameIndex])] for x in xrange(COLS[self.gameIndex])]
+        [[self.cell[x][y].show() for y in xrange(ROWS[self.gameIndex])] for x in xrange(COLS[self.gameIndex])]
 
         # Center the window
-        mainWindow.set_resizable(False)
-        width, height = mainWindow.get_size()
-        mainWindow.move((gtk.gdk.screen_width() - width) / 2, (gtk.gdk.screen_height() - height) / 2)
+        self.mainWindow.set_position(gtk.WIN_POS_CENTER)
 
-        mainWindow.show()
-        self.startGame()
+    def startMainMenu(self, widget, data=None):
+        self.mainWindow.destroy()
+        MainWindow().show()
 
     def startGame(self):
+        self.mainWindow.show()
         self.clearAllCells()
         self.setInitialPos()
         self.selectedCell = None
@@ -68,47 +150,111 @@ class VikingChess(object):
     def setInitialPos(self):
         self.kingX = -1
         self.kingY = -1
-        # Set throne
-        self.cell[4][4].isThrone = True
-        # Set white
-        self.cell[0][3].setWhite()
-        self.cell[0][4].setWhite()
-        self.cell[0][5].setWhite()
-        self.cell[1][4].setWhite()
-        self.cell[3][0].setWhite()
-        self.cell[4][0].setWhite()
-        self.cell[5][0].setWhite()
-        self.cell[4][1].setWhite()
-        self.cell[3][8].setWhite()
-        self.cell[4][8].setWhite()
-        self.cell[5][8].setWhite()
-        self.cell[4][7].setWhite()
-        self.cell[8][3].setWhite()
-        self.cell[8][4].setWhite()
-        self.cell[8][5].setWhite()
-        self.cell[7][4].setWhite()
-        self.whiteCount = 16
-        # Set black
-        self.cell[4][4].setBlackKing()
-        self.cell[2][4].setBlack()
-        self.cell[3][4].setBlack()
-        self.cell[5][4].setBlack()
-        self.cell[6][4].setBlack()
-        self.cell[4][2].setBlack()
-        self.cell[4][3].setBlack()
-        self.cell[4][5].setBlack()
-        self.cell[4][6].setBlack()
+        if 0 == self.gameIndex:
+            # Set throne
+            self.cell[4][4].isThrone = True
+            # Set white
+            self.cell[0][3].setWhite()
+            self.cell[0][4].setWhite()
+            self.cell[0][5].setWhite()
+            self.cell[1][4].setWhite()
+            self.cell[3][0].setWhite()
+            self.cell[4][0].setWhite()
+            self.cell[5][0].setWhite()
+            self.cell[4][1].setWhite()
+            self.cell[3][8].setWhite()
+            self.cell[4][8].setWhite()
+            self.cell[5][8].setWhite()
+            self.cell[4][7].setWhite()
+            self.cell[8][3].setWhite()
+            self.cell[8][4].setWhite()
+            self.cell[8][5].setWhite()
+            self.cell[7][4].setWhite()
+            self.whiteCount = 16
+            # Set black
+            self.cell[4][4].setBlackKing()
+            self.cell[2][4].setBlack()
+            self.cell[3][4].setBlack()
+            self.cell[5][4].setBlack()
+            self.cell[6][4].setBlack()
+            self.cell[4][2].setBlack()
+            self.cell[4][3].setBlack()
+            self.cell[4][5].setBlack()
+            self.cell[4][6].setBlack()
+        elif 1 == self.gameIndex:
+            # Set throne
+            self.cell[6][6].isThrone = True
+            # Set white
+            self.cell[0][4].setWhite()
+            self.cell[0][5].setWhite()
+            self.cell[0][6].setWhite()
+            self.cell[0][7].setWhite()
+            self.cell[0][8].setWhite()
+            self.cell[1][5].setWhite()
+            self.cell[1][7].setWhite()
+            self.cell[2][6].setWhite()
+
+            self.cell[4][0].setWhite()
+            self.cell[5][0].setWhite()
+            self.cell[6][0].setWhite()
+            self.cell[7][0].setWhite()
+            self.cell[8][0].setWhite()
+            self.cell[5][1].setWhite()
+            self.cell[7][1].setWhite()
+            self.cell[6][2].setWhite()
+
+            self.cell[12][4].setWhite()
+            self.cell[12][5].setWhite()
+            self.cell[12][6].setWhite()
+            self.cell[12][7].setWhite()
+            self.cell[12][8].setWhite()
+            self.cell[11][5].setWhite()
+            self.cell[11][7].setWhite()
+            self.cell[10][6].setWhite()
+
+            self.cell[4][12].setWhite()
+            self.cell[5][12].setWhite()
+            self.cell[6][12].setWhite()
+            self.cell[7][12].setWhite()
+            self.cell[8][12].setWhite()
+            self.cell[5][11].setWhite()
+            self.cell[7][11].setWhite()
+            self.cell[6][10].setWhite()
+
+            self.whiteCount = 32
+            # Set black
+            self.cell[6][6].setBlackKing()
+
+            self.cell[3][6].setBlack()
+            self.cell[4][4].setBlack()
+            self.cell[4][8].setBlack()
+            self.cell[5][5].setBlack()
+            self.cell[5][6].setBlack()
+            self.cell[5][7].setBlack()
+
+            self.cell[6][3].setBlack()
+            self.cell[8][4].setBlack()
+            self.cell[6][5].setBlack()
+            self.cell[7][5].setBlack()
+
+            self.cell[9][6].setBlack()
+            self.cell[8][8].setBlack()
+            self.cell[7][7].setBlack()
+            self.cell[7][6].setBlack()
+
+            self.cell[6][7].setBlack()
+            self.cell[6][9].setBlack()
     #def setInitialPos(self)
 
     def isGameOver(self):
         # Check whether the King reached the border
-        for x in [0, ROWS - 1]:
-            for y in xrange(COLS):
+        for x in [0, ROWS[self.gameIndex] - 1]:
+            for y in xrange(COLS[self.gameIndex]):
                 if self.cell[x][y].isBlackKing:
                     self.winner = "Black"
                     return True
-        for y in [0, COLS - 1]:
-            for x in xrange(ROWS):
+        for y in [0, COLS[self.gameIndex] - 1]:
+            for x in xrange(ROWS[self.gameIndex]):
                 if self.cell[x][y].isBlackKing:
                     self.winner = "Black"
                     return True
@@ -130,7 +276,7 @@ class VikingChess(object):
 
     # Unpress all buttons except current one
     def clearAllCells(self):
-        [[self.cell[x][y].clear() for x in xrange(COLS)] for y in xrange(ROWS)]
+        [[self.cell[x][y].clear() for x in xrange(COLS[self.gameIndex])] for y in xrange(ROWS[self.gameIndex])]
 
     def buttonClicked(self, cell, data=None):
         if cell.get_active():
@@ -218,7 +364,7 @@ class VikingChess(object):
         x = curCell.x
         y = curCell.y
         for (cx, cy) in [(x - 2, y), (x + 2, y), (x, y - 2), (x, y + 2)]:
-            if cx < 0 or cy < 0 or cx >= COLS or cy >= ROWS:
+            if cx < 0 or cy < 0 or cx >= COLS[self.gameIndex] or cy >= ROWS[self.gameIndex]:
                 continue
             (mx, my) = ((cx + x) / 2, (cy + y) / 2)
             if curCell.isWhite and cell[cx][cy].isWhite and cell[mx][my].isBlack:
@@ -290,5 +436,5 @@ def main():
 
 
 if __name__ == "__main__":
-    vc = VikingChess()
+    MainWindow().show()
     main()
