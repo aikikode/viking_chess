@@ -441,6 +441,7 @@ class Cell(gtk.ToggleButton):
         # Copy the current style and replace the background
         style = self.get_style().copy()
         style.bg[gtk.STATE_NORMAL] = color
+        style.bg[gtk.STATE_PRELIGHT] = color
         # Set the button's style to the one you created
         self.set_style(style)
 
