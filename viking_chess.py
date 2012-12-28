@@ -400,6 +400,7 @@ class Cell(gtk.ToggleButton):
         self.x = x
         self.y = y
         self.set_size_request(40, 40)
+        self.set_label("")
         self.isWhite = False
         self.isBlack = False
         self.isBlackKing = False
@@ -407,35 +408,43 @@ class Cell(gtk.ToggleButton):
         self.setColor(BUTTON_EMPTY_BG_COLOR)
 
     def clear(self):
-        self.set_label("")
         self.isWhite = False
         self.isBlack = False
         self.isBlackKing = False
-        self.setColor(BUTTON_EMPTY_BG_COLOR)
+#        self.setColor(BUTTON_EMPTY_BG_COLOR)
         self.set_image(gtk.Image())
 
     def setWhite(self):
-        self.set_label("W")
         self.isWhite = True
         self.isBlack = False
         self.isBlackKing = False
-        self.setColor(WHITE_KNIGHT_COLOR)
+#        self.setColor(WHITE_KNIGHT_COLOR)
+        pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/white_knight.png")
+        scaled_buf = pixbuf.scale_simple(30,30,gtk.gdk.INTERP_BILINEAR)
+        image = gtk.Image()
+        image.set_from_pixbuf(scaled_buf)
+        self.set_image(image)
+
 
     def setBlack(self):
-        self.set_label("B")
         self.isWhite = False
         self.isBlack = True
         self.isBlackKing = False
-        self.setColor(BLACK_KNIGHT_COLOR)
+#        self.setColor(BLACK_KNIGHT_COLOR)
+        pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/black_knight.png")
+        scaled_buf = pixbuf.scale_simple(30,30,gtk.gdk.INTERP_BILINEAR)
+        image = gtk.Image()
+        image.set_from_pixbuf(scaled_buf)
+        self.set_image(image)
+
 
     def setBlackKing(self):
-        self.set_label("")
         self.isWhite = False
         self.isBlack = False
         self.isBlackKing = True
         self.mainWindow.kingX = self.x
         self.mainWindow.kingY = self.y
-        self.setColor(BLACK_KING_COLOR)
+#        self.setColor(BLACK_KING_COLOR)
         pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/circle_red.png")
         scaled_buf = pixbuf.scale_simple(30,30,gtk.gdk.INTERP_BILINEAR)
         image = gtk.Image()
