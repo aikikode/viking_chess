@@ -24,8 +24,11 @@
 # <http://www.gnu.org/licenses>
 #
 
+# TODO: king can fight
+# TODO: on small board 2 white knights are enough to kill the black King (4 - on the throne and 3  - 'with' the throne)
 # TODO: white knight can move inside the fortress, but once it leaves it, it can't return.
 # TODO: no knight or king can move inside the fortress or over it
+# TODO: add game rules
 
 import sys
 import pygtk
@@ -33,32 +36,28 @@ pygtk.require('2.0')
 import gtk
 
 VERSION = "0.0.1"
-ROWS = [9, 13]
-COLS = [9, 13]
 
+BOARD_SIZE = (9, 13)  # all boards are square -> no need to store 2 dimensions
+
+# Colors definitions (in 256-base RGB)
+BUTTON_EMPTY_BG_COLOR = (215, 152,  36)   # initially empty cell
+WHITE_FORTRESS_COLOR  = (  0, 100,   0)   # initial white knights location
+BLACK_FORTRESS_COLOR  = (  0,   0, 250)   # initial black knights and king location
+TARGET_CELL_COLOR     = (255,   0,   0)   # cells where the King should go to win
+
+# Conversion between GTK color system and 256-RGB
 GTK_COLOR_BASE = 65535
 RGB_COLOR_BASE = 255
-BUTTON_EMPTY_BG_COLOR = (215, 152, 36)
+def rgb_to_gtk_simple(rgb_color): return GTK_COLOR_BASE * rgb_color / RGB_COLOR_BASE
+def RGB_TO_GTK(rgb_color_tuple): return map(rgb_to_gtk_simple, rgb_color_tuple)
 
-WHITE_FORTRESS_COLOR = (0, 100, 0)
-BLACK_FORTRESS_COLOR = (0, 0, 250)
-
-TARGET_CELL_COLOR = (255, 0, 0)
-
-WHITE_KNIGHT_COLOR = (240, 240, 240)
-BLACK_KNIGHT_COLOR = (50, 50, 50)
-BLACK_KING_COLOR = (10, 10, 10)
-
+# Enable images on buttons (since they are disabled by default)
 if sys.platform=="win32":
     gtk.settings_get_default().set_long_property("gtk-button-images", True, "main")
 else:
     settings = gtk.settings_get_default()
     settings.props.gtk_button_images = True
 
-def rgb_to_gtk_simple(rgb_color): return GTK_COLOR_BASE * rgb_color / RGB_COLOR_BASE
-
-def RGB_TO_GTK(rgb_color_tuple):
-    return map(rgb_to_gtk_simple, rgb_color_tuple)
 ##############################################################################
 class MainWindow(gtk.Window):
     """ Main window the user sees after application starts.
@@ -106,8 +105,8 @@ class LocalGameSetup(gtk.Window):
 
         lblFieldSize = gtk.Label("Set field size:")
         self.cboxFieldSize = gtk.combo_box_new_text()
-        self.cboxFieldSize.append_text(str(ROWS[0]) + " x " + str(ROWS[0]))
-        self.cboxFieldSize.append_text(str(ROWS[1]) + " x " + str(ROWS[1]))
+        self.cboxFieldSize.append_text(str(BOARD_SIZE[0]) + " x " + str(BOARD_SIZE[0]))
+        self.cboxFieldSize.append_text(str(BOARD_SIZE[1]) + " x " + str(BOARD_SIZE[1]))
         self.cboxFieldSize.set_active(0)
         btStartGame = gtk.Button(label="Start Game")
         btStartGame.connect("clicked", self.startGame, None)
@@ -150,17 +149,17 @@ class VikingChessBoard(object):
         mainWindow.set_title("Viking Chess")
         mainWindow.set_resizable(False)
         self.vbox = gtk.VBox()
-        self.hbox = [HBox(x) for x in xrange(ROWS[self.gameIndex])]
-        [self.vbox.pack_start(self.hbox[x]) for x in xrange(ROWS[self.gameIndex])]
+        self.hbox = [HBox(x) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [self.vbox.pack_start(self.hbox[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
 
         # Place the board on the window
-        self.cell = [[Cell(self, x, y) for y in xrange(ROWS[self.gameIndex])] for x in xrange(COLS[self.gameIndex])]
-        [[self.hbox[x].pack_start(self.cell[x][y]) for y in xrange(ROWS[self.gameIndex])] for x in xrange(COLS[self.gameIndex])]
+        self.cell = [[Cell(self, x, y) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [[self.hbox[x].pack_start(self.cell[x][y]) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
         mainWindow.add(self.vbox)
         self.vbox.show()
-        [self.hbox[x].show() for x in xrange(ROWS[self.gameIndex])]
-        [[self.cell[x][y].connect("clicked", self.buttonClicked, None) for y in xrange(ROWS[self.gameIndex])] for x in xrange(COLS[self.gameIndex])]
-        [[self.cell[x][y].show() for y in xrange(ROWS[self.gameIndex])] for x in xrange(COLS[self.gameIndex])]
+        [self.hbox[x].show() for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [[self.cell[x][y].connect("clicked", self.buttonClicked, None) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [[self.cell[x][y].show() for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
 
         # Center the window
         self.mainWindow.set_position(gtk.WIN_POS_CENTER)
@@ -207,9 +206,9 @@ class VikingChessBoard(object):
         self.kingY = -1
         # Set locked corner cells
         corners = [(0, 0),
-                   (0, COLS[self.gameIndex] - 1),
-                   (ROWS[self.gameIndex] - 1, 0),
-                   (ROWS[self.gameIndex] - 1, COLS[self.gameIndex] - 1)]
+                   (BOARD_SIZE[self.gameIndex] - 1, 0),
+                   (0, BOARD_SIZE[self.gameIndex] - 1),
+                   (BOARD_SIZE[self.gameIndex] - 1, BOARD_SIZE[self.gameIndex] - 1)]
         if 0 == self.gameIndex:
             # Set white
             self.setInitialWhitePos([(0, 3), (0, 4), (0, 5), (1, 4),
@@ -229,14 +228,15 @@ class VikingChessBoard(object):
             self.setTargetPos(corners)
         elif 1 == self.gameIndex:
             # Set target positions for a King to reach
-            # NB: this should be done before setting the knight on the board
-            # because these cells will overlap
+            # NB: this should be done before setting the knights on the board
+            #     because these cells may overlap and 'knights' cells are excluded
+            #     from 'target' cells
             targetCells = []
-            for x in [0, ROWS[self.gameIndex] - 1]:
-                for y in xrange(COLS[self.gameIndex]):
+            for y in [0, BOARD_SIZE[self.gameIndex] - 1]:
+                for x in xrange(BOARD_SIZE[self.gameIndex]):
                     targetCells.append((x, y))
-            for y in [0, COLS[self.gameIndex] - 1]:
-                for x in xrange(ROWS[self.gameIndex]):
+            for x in [0, BOARD_SIZE[self.gameIndex] - 1]:
+                for y in xrange(BOARD_SIZE[self.gameIndex]):
                     targetCells.append((x, y))
             self.setTargetPos(targetCells)
             # Set white
@@ -280,7 +280,7 @@ class VikingChessBoard(object):
 
     # Unpress all buttons except current one
     def clearAllCells(self):
-        [[self.cell[x][y].clear() for x in xrange(COLS[self.gameIndex])] for y in xrange(ROWS[self.gameIndex])]
+        [[self.cell[x][y].clear() for x in xrange(BOARD_SIZE[self.gameIndex])] for y in xrange(BOARD_SIZE[self.gameIndex])]
 
     def buttonClicked(self, cell, data=None):
         if cell.get_active():
@@ -375,7 +375,7 @@ class VikingChessBoard(object):
         x = curCell.x
         y = curCell.y
         for (cx, cy) in [(x - 2, y), (x + 2, y), (x, y - 2), (x, y + 2)]:
-            if cx < 0 or cy < 0 or cx >= COLS[self.gameIndex] or cy >= ROWS[self.gameIndex]:
+            if cx < 0 or cy < 0 or cx >= BOARD_SIZE[self.gameIndex] or cy >= BOARD_SIZE[self.gameIndex]:
                 continue
             (mx, my) = ((cx + x) / 2, (cy + y) / 2)
             if curCell.isWhite and (cell[cx][cy].isWhite or cell[cx][cy].isCorner) and cell[mx][my].isBlack:
