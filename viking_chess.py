@@ -24,8 +24,6 @@
 # <http://www.gnu.org/licenses>
 #
 
-# TODO: white knight can move inside the fortress, but once it leaves it, it can't return.
-# TODO: no knight or king can move inside the fortress or over it
 # TODO: add game rules
 
 import sys
@@ -182,6 +180,18 @@ class VikingChessBoard(object):
             self.cell[x][y].isWhiteFortress = True
             self.cell[x][y].setColor(WHITE_FORTRESS_COLOR)
 
+    def addWhiteFortressPos(self, coordsList):
+        # Although white fortress cells are defined during white knights setting,
+        # on some boards we need to add move fortress cells to make a fortress
+        # without 'empty' cells inside. Because if they exist and white knight
+        # moves to it, it will never come out due to the game rule: "no knight
+        # or king can move from an 'empty' cell to or over a fortress cell"
+        for (x, y) in coordsList:
+            self.cell[x][y].set_label("")
+            self.cell[x][y].isTarget = False
+            self.cell[x][y].isWhiteFortress = True
+            self.cell[x][y].setColor(WHITE_FORTRESS_COLOR)
+
     def setInitialBlackPos(self, coordsList):
         for (x, y) in coordsList:
             self.cell[x][y].set_label("")
@@ -242,6 +252,7 @@ class VikingChessBoard(object):
                                      (4, 0), (5, 0), (6, 0), (7, 0), (8, 0), (5, 1), (7, 1), (6, 2),
                                      (12, 4), (12, 5), (12, 6), (12, 7), (12, 8), (11, 5), (11, 7), (10, 6),
                                      (4, 12), (5, 12), (6, 12), (7, 12), (8, 12), (5, 11), (7, 11), (6, 10)])
+            self.addWhiteFortressPos([(6, 1), (1, 6), (6, 11), (11, 6)])
             self.whiteCount = 32
             # Set black
             self.setInitialBlackPos([(3, 6), (4, 4), (4, 8), (5, 5), (5, 6), (5, 7),
@@ -329,27 +340,37 @@ class VikingChessBoard(object):
     def isValidMove(self, toCell):
         """ check whether the move from self.selectedCell to toCell is valid """
         fromCell = self.selectedCell
+        cell = self.cell
         # We should've already checked that the correct knight is selected
         # 1. Allow only horizontal and vertical moves
         if fromCell.x != toCell.x and fromCell.y != toCell.y:
             return False
-        # 2. Do not allow jumping over other knights and over (and to) the throne cell
+        # 2. Do not allow jumping into the white fortress
+        if not fromCell.isWhiteFortress and toCell.isWhiteFortress:
+            return False
+        # 3. Do not allow jumping over other knights and over (and to) the throne cell
+        #    and over the fortress
         if toCell.isThrone or not toCell.isEmpty():
             return False
         if fromCell.x == toCell.x: # move along Y axis
             minY = min(fromCell.y, toCell.y)
             maxY = max(fromCell.y, toCell.y)
             for y in xrange(minY + 1, maxY):
-                if not self.cell[fromCell.x][y].isEmpty() or self.cell[fromCell.x][y].isThrone:
+                if not cell[fromCell.x][y].isEmpty() or cell[fromCell.x][y].isThrone or\
+                   (cell[fromCell.x][y].isWhiteFortress and not fromCell.isWhiteFortress):
                     return False
         else:                      # move along X axis
             minX = min(fromCell.x, toCell.x)
             maxX = max(fromCell.x, toCell.x)
             for x in xrange(minX + 1, maxX):
-                if not self.cell[x][fromCell.y].isEmpty() or self.cell[x][fromCell.y].isThrone:
+                if not cell[x][fromCell.y].isEmpty() or cell[x][fromCell.y].isThrone or\
+                   (cell[x][fromCell.y].isWhiteFortress and not fromCell.isWhiteFortress):
                     return False
-        # 3. Do not allow jumping over and into the white fortress,
-        #    but only if the knight is already in it
+        # 2*. Do not allow moving from one fortress to another:
+        #     if the dist between cells is > half the board - deny the move
+        if fromCell.isWhiteFortress and toCell.isWhiteFortress and\
+           abs(fromCell.x - toCell.x + fromCell.y - toCell.y) > (BOARD_SIZE[self.gameIndex] - 1) / 2:
+            return False
         # 4. Only the King can move to a corner
         if toCell.isCorner and not fromCell.isBlackKing:
             return False
@@ -457,7 +478,7 @@ class VikingChessBoard(object):
                 return
             else:
                 return
-        # No we know that the king is not near the border
+        # Now we know that the king is not near the border
         # Check whether we are surrounded on the throne
         if cell[kingX][kingY].isThrone:
             for (x, y) in [(kingX - 1, kingY),
