@@ -515,12 +515,25 @@ class VikingChessBoard(object):
                             continue
                     #if cell[mx][my].isThrone
                 #elif cell[mx][my].isBlackKing
+            #if curCell.isWhite and (cell[cx][cy].isWhite or cell[cx][cy].isCorner or cell[cx][cy].isThrone)
             # Black King can fight too
             if (curCell.isBlack or curCell.isBlackKing) and\
                (cell[cx][cy].isBlack or cell[cx][cy].isBlackKing or cell[cx][cy].isCorner or cell[cx][cy].isThrone) and\
                cell[mx][my].isWhite:
                 self.whiteCount -= 1
                 cell[mx][my].clear()
+            # Special situation: white can kill a black knight if it is surrounded
+            # from 3 sides and the black king if from the 4-th side
+            if curCell.isWhite and cell[cx][cy].isBlackKing and cell[mx][my].isBlack:
+                # Make sure the knight we attack is not near the border
+                if not (0 == mx or BOARD_SIZE[self.gameIndex] - 1 == mx or
+                        0 == my or BOARD_SIZE[self.gameIndex] - 1 == my):
+                    if cx == mx:
+                        if cell[mx - 1][my].isWhite and cell[mx + 1][my].isWhite:
+                            cell[mx][my].clear()
+                    elif cy == my:
+                        if cell[mx][my - 1].isWhite and cell[mx][my + 1].isWhite:
+                            cell[mx][my].clear()
     #def checkKilledKnights(self, curCell)
 
     def showCheckWarn(self):

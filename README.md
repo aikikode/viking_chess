@@ -12,7 +12,8 @@ White win if they defeat the king before this happens.
 
 How to move
 -----------
-- All knights move like a rook from ordinary chess.
+- All knights move like a rook from ordinary chess (horizontally and
+  vertically)
 - King can move 3 cells maximum
 - Knights and the king cannot jump over other ones and the throne
 - Knights and the king (once it steps away from the throne) cannot be placed
@@ -35,6 +36,12 @@ How to attack a knight
   throne
 - Note, that if a knight itself moves to the 'under attack' position it
   is not killed
+- These's a special attack on the black knight defending the king: if a
+  black knight is between two white knights (it moved there itself so it's
+  not killed) and it has a king from the 3-rd side, then it can be killed
+  by a white knight that moves to it's 4-th side (so that it is now
+  surrounded by white knights from 3 sides and black king from the forth
+  side)
 
 How to attack the king
 ----------------------
