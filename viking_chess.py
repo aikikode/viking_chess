@@ -39,7 +39,7 @@ BOARD_SIZE = (9, 13)  # all boards are square -> no need to store 2 dimensions
 BUTTON_EMPTY_BG_COLOR = (215, 152,  36)   # initially empty cell
 WHITE_FORTRESS_COLOR  = (  0, 100,   0)   # initial white knights location
 BLACK_FORTRESS_COLOR  = (  0,   0, 250)   # initial black knights and king location
-TARGET_CELL_COLOR     = (255,   0,   0)   # cells where the King should go to win
+TARGET_CELL_COLOR     = (100,   0,   0)   # cells where the King should go to win
 
 # Conversion between GTK color system and 256-RGB
 GTK_COLOR_BASE = 65535
@@ -245,6 +245,7 @@ class VikingChessBoard(object):
             # Set king
             self.cell[4][4].isThrone = True
             self.cell[4][4].setBlackKing()
+            self.cell[4][4].setColor(TARGET_CELL_COLOR)
             # Set target positions for a King to reach - in this game they are the corners
             self.setTargetPos(corners)
         elif 1 == self.gameIndex:
@@ -276,6 +277,7 @@ class VikingChessBoard(object):
             # Set king
             self.cell[6][6].isThrone = True
             self.cell[6][6].setBlackKing()
+            self.cell[6][6].setColor(TARGET_CELL_COLOR)
         self.setCornerPos(corners)
     #def setInitialPos(self)
 
