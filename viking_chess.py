@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # Copyright 2012
@@ -23,6 +24,10 @@
 # <http://www.gnu.org/licenses>
 #
 
+import pygtk
+import sys
+
+pygtk.require('2.0')
 import gtk
 
 VERSION = "0.0.1"
@@ -32,13 +37,21 @@ COLS = [9, 13]
 GTK_COLOR_BASE = 65535
 RGB_COLOR_BASE = 255
 BUTTON_EMPTY_BG_COLOR = (215, 152, 36)
-WHITE_KNIGHT_COLOR = (240, 240, 240)
+
 WHITE_FORTRESS_COLOR = (0, 100, 0)
+BLACK_FORTRESS_COLOR = (0, 0, 250)
+
+TARGET_CELL_COLOR = (255, 0, 0)
+
+WHITE_KNIGHT_COLOR = (240, 240, 240)
 BLACK_KNIGHT_COLOR = (50, 50, 50)
 BLACK_KING_COLOR = (10, 10, 10)
 
-settings = gtk.settings_get_default()
-settings.props.gtk_button_images = True
+if sys.platform=="win32":
+    gtk.settings_get_default().set_long_property("gtk-button-images", True, "main")
+else:
+    settings = gtk.settings_get_default()
+    settings.props.gtk_button_images = True
 
 def rgb_to_gtk_simple(rgb_color): return GTK_COLOR_BASE * rgb_color / RGB_COLOR_BASE
 
@@ -164,15 +177,27 @@ class VikingChessBoard(object):
 
     def setInitialWhitePos(self, coordsList):
         for (x, y) in coordsList:
+            self.cell[x][y].set_label("")
             self.cell[x][y].setWhite()
+            self.cell[x][y].isTarget = False
             self.cell[x][y].setColor(WHITE_FORTRESS_COLOR)
+
+    def setInitialBlackPos(self, coordsList):
+        for (x, y) in coordsList:
+            self.cell[x][y].set_label("")
+            self.cell[x][y].setBlack()
+            self.cell[x][y].setColor(BLACK_FORTRESS_COLOR)
+
+    def setTargetPos(self, coordsList):
+        for (x, y) in coordsList:
+            self.cell[x][y].set_label("")
+            self.cell[x][y].isTarget = True
+            self.cell[x][y].setColor(TARGET_CELL_COLOR)
 
     def setInitialPos(self):
         self.kingX = -1
         self.kingY = -1
         if 0 == self.gameIndex:
-            # Set throne
-            self.cell[4][4].isThrone = True
             # Set white
             self.setInitialWhitePos([(0, 3), (0, 4), (0, 5), (1, 4),
                                      (3, 0), (4, 0), (5, 0), (4, 1),
@@ -180,18 +205,28 @@ class VikingChessBoard(object):
                                      (8, 3), (8, 4), (8, 5), (7, 4)])
             self.whiteCount = 16
             # Set black
+            # NB: set king position among black knights first to color the cell
+            self.setInitialBlackPos([(2, 4), (3 ,4), (5, 4), (6, 4),
+                                     (4, 2), (4, 3), (4, 5), (4, 6),
+                                     (4, 4)])
+            # Set king
+            self.cell[4][4].isThrone = True
             self.cell[4][4].setBlackKing()
-            self.cell[2][4].setBlack()
-            self.cell[3][4].setBlack()
-            self.cell[5][4].setBlack()
-            self.cell[6][4].setBlack()
-            self.cell[4][2].setBlack()
-            self.cell[4][3].setBlack()
-            self.cell[4][5].setBlack()
-            self.cell[4][6].setBlack()
+            # Set target positions for a King to reach
+            self.setTargetPos([(0, 0), (0, 8), (8, 0), (8, 8)])
+
         elif 1 == self.gameIndex:
-            # Set throne
-            self.cell[6][6].isThrone = True
+            # Set target positions for a King to reach
+            # NB: this should be done before setting the knight on the board
+            # because these cells will overlap
+            targetCells = []
+            for x in [0, ROWS[self.gameIndex] - 1]:
+                for y in xrange(COLS[self.gameIndex]):
+                    targetCells.append((x, y))
+            for y in [0, COLS[self.gameIndex] - 1]:
+                for x in xrange(ROWS[self.gameIndex]):
+                    targetCells.append((x, y))
+            self.setTargetPos(targetCells)
             # Set white
             self.setInitialWhitePos([(0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (1, 5), (1, 7), (2, 6),
                                      (4, 0), (5, 0), (6, 0), (7, 0), (8, 0), (5, 1), (7, 1), (6, 2),
@@ -199,41 +234,21 @@ class VikingChessBoard(object):
                                      (4, 12), (5, 12), (6, 12), (7, 12), (8, 12), (5, 11), (7, 11), (6, 10)])
             self.whiteCount = 32
             # Set black
+            self.setInitialBlackPos([(3, 6), (4, 4), (4, 8), (5, 5), (5, 6), (5, 7),
+                                     (6 ,3), (8, 4), (6, 5), (7, 5),
+                                     (9, 6), (8, 8), (7, 7), (7, 6),
+                                     (6, 7), (6, 9),
+                                     (6, 6)])
+            # Set king
+            self.cell[6][6].isThrone = True
             self.cell[6][6].setBlackKing()
-
-            self.cell[3][6].setBlack()
-            self.cell[4][4].setBlack()
-            self.cell[4][8].setBlack()
-            self.cell[5][5].setBlack()
-            self.cell[5][6].setBlack()
-            self.cell[5][7].setBlack()
-
-            self.cell[6][3].setBlack()
-            self.cell[8][4].setBlack()
-            self.cell[6][5].setBlack()
-            self.cell[7][5].setBlack()
-
-            self.cell[9][6].setBlack()
-            self.cell[8][8].setBlack()
-            self.cell[7][7].setBlack()
-            self.cell[7][6].setBlack()
-
-            self.cell[6][7].setBlack()
-            self.cell[6][9].setBlack()
     #def setInitialPos(self)
 
     def isGameOver(self):
-        # Check whether the King reached the border
-        for x in [0, ROWS[self.gameIndex] - 1]:
-            for y in xrange(COLS[self.gameIndex]):
-                if self.cell[x][y].isBlackKing:
-                    self.winner = "Black"
-                    return True
-        for y in [0, COLS[self.gameIndex] - 1]:
-            for x in xrange(ROWS[self.gameIndex]):
-                if self.cell[x][y].isBlackKing:
-                    self.winner = "Black"
-                    return True
+        # Check whether the King reached the target cell
+        if self.cell[self.kingX][self.kingY].isTarget:
+            self.winner = "Black"
+            return True
         # If there are no white knights left, black wins
         if self.whiteCount <= 0:
             self.winner = "Black"
@@ -367,6 +382,7 @@ class Cell(gtk.ToggleButton):
         self.isBlack = False
         self.isBlackKing = False
         self.isThrone = False
+        self.isTarget = False
         self.setColor(BUTTON_EMPTY_BG_COLOR)
 
     def clear(self):
@@ -403,7 +419,7 @@ class Cell(gtk.ToggleButton):
         self.isBlackKing = True
         self.mainWindow.kingX = self.x
         self.mainWindow.kingY = self.y
-        pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/circle_red.png")
+        pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/black_king.png")
         scaled_buf = pixbuf.scale_simple(30,30,gtk.gdk.INTERP_BILINEAR)
         image = gtk.Image()
         image.set_from_pixbuf(scaled_buf)
