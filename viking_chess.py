@@ -140,9 +140,9 @@ class VikingChessBoard(object):
         self.gameIndex = gameIndex
         self.whiteCount = 0
         self.mainWindow = mainWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        mainWindow.connect("delete-event", self.startMainMenu) # Show main menu on exit
+        mainWindow.connect("delete-event", self.onClose)
         mainWindow.set_keep_above(True)
-        mainWindow.set_title("Viking Chess")
+        self.mainWindow.set_title("Viking Chess - White")
         mainWindow.set_resizable(False)
         self.vbox = gtk.VBox()
         self.hbox = [HBox(x) for x in xrange(BOARD_SIZE[self.gameIndex])]
@@ -160,9 +160,22 @@ class VikingChessBoard(object):
         # Center the window
         self.mainWindow.set_position(gtk.WIN_POS_CENTER)
 
-    def startMainMenu(self, widget, data=None):
-        self.mainWindow.destroy()
-        MainWindow().show()
+    def onClose(self, widget, data=None):
+        dialog = gtk.MessageDialog(self.mainWindow,
+            gtk.DIALOG_MODAL,
+            gtk.MESSAGE_INFO,
+            gtk.BUTTONS_YES_NO,
+            "Quit the game? It will discard all game progress.")
+        dialog.set_title("Confirm Quit")
+        response = dialog.run()
+        dialog.destroy()
+        if response == gtk.RESPONSE_YES:
+            self.mainWindow.destroy()
+            MainWindow().show() # Show main menu on exit
+        else:
+            return True
+    #def onClose(self, widget, data=None)
+
 
     def startGame(self):
         self.mainWindow.show()
@@ -293,7 +306,7 @@ class VikingChessBoard(object):
             # Allow to select only the knights of player color
             if (self.whiteTurn and cell.isWhite) or\
                (not self.whiteTurn and (cell.isBlack or cell.isBlackKing)): # choose the knight to move
-                if self.selectedCell is not None:
+                if self.selectedCell is not None and self.selectedCell != cell:
                     self.selectedCell.set_active(False)
                 self.selectedCell = cell
             else: # move the knight if possible
@@ -304,27 +317,29 @@ class VikingChessBoard(object):
                         cell.setBlack()
                     elif self.selectedCell.isBlackKing:
                         cell.setBlackKing()
-                    self.selectedCell.set_active(False)
                     cell.set_active(False)
                     self.selectedCell.clear()
                     if self.selectedCell.isThrone:
                         # The king just moved from the Throne -
                         # set special label to indicate the Throne
                         self.selectedCell.set_label("X")
-                    self.selectedCell = None
+                    self.selectedCell.set_active(False)
                     self.checkKilledKnights(cell)
                     self.checkClearCheck()
                     # Always check whether anybody won the game after each move
                     if not self.isGameOver():  # It's important not to switch turns before calling this function!
                         self.whiteTurn = not self.whiteTurn # ...now it's safe
+                        whoseTurn = "White" if self.whiteTurn else "Black"
+                        self.mainWindow.set_title("Viking Chess - " + whoseTurn)
                     else:
+                        self.mainWindow.set_title("Viking Chess - " + self.winner + " won!")
                         winner = self.winner
                         winnerDialog = gtk.MessageDialog(
                             parent = None,
                             flags = gtk.DIALOG_DESTROY_WITH_PARENT,
                             type = gtk.MESSAGE_INFO,
                             buttons = gtk.BUTTONS_OK,
-                            message_format = self.winner + " wins!"
+                            message_format = self.winner + " won!"
                         )
                         winnerDialog.set_title("Round complete!")
                         winnerDialog.connect('response', lambda dialog, response: self.startGame())
@@ -334,6 +349,10 @@ class VikingChessBoard(object):
                         winnerDialog.destroy()
                 else:
                     cell.set_active(False)
+        else:
+            if self.selectedCell == cell:
+                # Unselect current cell
+                self.selectedCell = None
             #if (self.whiteTurn and cell.isWhite)...
     #def buttonClicked(self, cell, data=None)
 
@@ -408,6 +427,7 @@ class VikingChessBoard(object):
                     if 0 == mx or BOARD_SIZE[self.gameIndex] - 1 == mx or\
                        0 == my or BOARD_SIZE[self.gameIndex] - 1 == my:
                         self.isCheck = True
+                        self.showCheckWarn()
                         continue
                     # This may be a check, usually it is, but we need to check 2 exclusions:
                     # 1. the king is on the throne and surrounded by white knights
@@ -422,6 +442,7 @@ class VikingChessBoard(object):
                                 break
                         else:
                             self.isCheck = True
+                            self.showCheckWarn()
                             continue
                     else:
                         whiteCounts = 0
@@ -438,10 +459,12 @@ class VikingChessBoard(object):
                             # 2-nd case
                             if whiteCounts == 3:
                                 self.isCheck = True
+                                self.showCheckWarn()
                                 continue
                         else:
                             # Throne is not nearby and the King is between 2 white knights -> it's check
                             self.isCheck = True
+                            self.showCheckWarn()
                             continue
                     #if cell[mx][my].isThrone
                 #elif cell[mx][my].isBlackKing
@@ -452,6 +475,16 @@ class VikingChessBoard(object):
                 self.whiteCount -= 1
                 cell[mx][my].clear()
     #def checkKilledKnights(self, curCell)
+
+    def showCheckWarn(self):
+        dialog = gtk.MessageDialog(self.mainWindow,
+            gtk.DIALOG_MODAL,
+            gtk.MESSAGE_INFO,
+            gtk.BUTTONS_CLOSE,
+            "Black king is in check!\nYou have one move to rescue him!")
+        dialog.set_title("King in check!")
+        response = dialog.run()
+        dialog.destroy()
 
     def checkClearCheck(self):
         """ Try to clear isCheck flag """
@@ -507,7 +540,7 @@ class VikingChessBoard(object):
             else:
                 # Throne is not nearby
                 if whiteCounts < 2:
-                    # King cannot be under check with one white knight
+                    # King cannot be in check with one white knight
                     self.isCheck = False
                     return
                 else:
@@ -539,12 +572,14 @@ class Cell(gtk.ToggleButton):
         self.setColor(BUTTON_EMPTY_BG_COLOR)
 
     def clear(self):
+        self.set_label("")
         self.isWhite = False
         self.isBlack = False
         self.isBlackKing = False
         self.set_image(gtk.Image())
 
     def setWhite(self):
+        self.set_label("")
         self.isWhite = True
         self.isBlack = False
         self.isBlackKing = False
@@ -556,6 +591,7 @@ class Cell(gtk.ToggleButton):
 
 
     def setBlack(self):
+        self.set_label("")
         self.isWhite = False
         self.isBlack = True
         self.isBlackKing = False
@@ -567,6 +603,7 @@ class Cell(gtk.ToggleButton):
 
 
     def setBlackKing(self):
+        self.set_label("")
         self.isWhite = False
         self.isBlack = False
         self.isBlackKing = True
@@ -587,6 +624,9 @@ class Cell(gtk.ToggleButton):
         style = self.get_style().copy()
         style.bg[gtk.STATE_NORMAL] = color
         style.bg[gtk.STATE_PRELIGHT] = color
+        style.bg[gtk.STATE_ACTIVE] = color
+        style.bg[gtk.STATE_INSENSITIVE] = color
+        style.bg[gtk.STATE_SELECTED] = color
         # Set the button's style to the one you created
         self.set_style(style)
 
@@ -594,7 +634,6 @@ class Cell(gtk.ToggleButton):
         return not (self.isWhite or self.isBlack or self.isBlackKing)
 
     def setThrone(self):
-        print "setThrone"
         self.isThrone = True
         self.set_label("X")
 #class Cell(gtk.ToggleButton)
