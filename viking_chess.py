@@ -62,7 +62,7 @@ else:
 class MainWindow(gtk.Window):
     """ Main window the user sees after application starts.
         It should present choices to start a local game,
-        start a server or connectn to existing one """
+        start a server or connect to existing one """
     def __init__(self):
         gtk.Window.__init__(self)
         self.connect("delete-event", gtk.main_quit) # Prevent application hanging after closing the window
@@ -103,16 +103,16 @@ class LocalGameSetup(gtk.Window):
         self.set_position(gtk.WIN_POS_CENTER)
         self.set_resizable(False)
 
-        lblFieldSize = gtk.Label("Set field size:")
-        self.cboxFieldSize = gtk.combo_box_new_text()
-        self.cboxFieldSize.append_text(str(BOARD_SIZE[0]) + " x " + str(BOARD_SIZE[0]))
-        self.cboxFieldSize.append_text(str(BOARD_SIZE[1]) + " x " + str(BOARD_SIZE[1]))
-        self.cboxFieldSize.set_active(0)
+        lblBoardSize = gtk.Label("Set board size:")
+        self.cboxBoardSize = gtk.combo_box_new_text()
+        self.cboxBoardSize.append_text(str(BOARD_SIZE[0]) + " x " + str(BOARD_SIZE[0]))
+        self.cboxBoardSize.append_text(str(BOARD_SIZE[1]) + " x " + str(BOARD_SIZE[1]))
+        self.cboxBoardSize.set_active(0)
         btStartGame = gtk.Button(label="Start Game")
         btStartGame.connect("clicked", self.startGame, None)
         hbox = gtk.HBox(True, 3)
-        hbox.pack_start(lblFieldSize, False, False, 10)
-        hbox.pack_end(self.cboxFieldSize, False, False, 10)
+        hbox.pack_start(lblBoardSize, False, False, 10)
+        hbox.pack_end(self.cboxBoardSize, False, False, 10)
         hbox2 = gtk.HBox(True, 3)
         hbox2.pack_start(btStartGame, False, False, 10)
         vbox = gtk.VBox(False, 3)
@@ -121,8 +121,8 @@ class LocalGameSetup(gtk.Window):
         self.add(vbox)
 
         # Show all controls
-        lblFieldSize.show()
-        self.cboxFieldSize.show()
+        lblBoardSize.show()
+        self.cboxBoardSize.show()
         btStartGame.show()
         hbox.show()
         hbox2.show()
@@ -135,7 +135,7 @@ class LocalGameSetup(gtk.Window):
 
     def startGame(self, widget, data = None):
         # Get options
-        index = self.cboxFieldSize.get_active()
+        index = self.cboxBoardSize.get_active()
         self.destroy()
         VikingChessBoard(index).startGame()
 
