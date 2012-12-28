@@ -24,9 +24,11 @@
 # <http://www.gnu.org/licenses>
 #
 
-import pygtk
-import sys
+# TODO: white knight can move inside the fortress, but once it leaves it, it can't return.
+# TODO: no knight or king can move inside the fortress or over it
 
+import sys
+import pygtk
 pygtk.require('2.0')
 import gtk
 
@@ -180,6 +182,7 @@ class VikingChessBoard(object):
             self.cell[x][y].set_label("")
             self.cell[x][y].setWhite()
             self.cell[x][y].isTarget = False
+            self.cell[x][y].isWhiteFortress = True
             self.cell[x][y].setColor(WHITE_FORTRESS_COLOR)
 
     def setInitialBlackPos(self, coordsList):
@@ -194,9 +197,19 @@ class VikingChessBoard(object):
             self.cell[x][y].isTarget = True
             self.cell[x][y].setColor(TARGET_CELL_COLOR)
 
+    def setCornerPos(self, coordsList):
+        for (x, y) in coordsList:
+            self.cell[x][y].set_label("X")
+            self.cell[x][y].isCorner = True
+
     def setInitialPos(self):
         self.kingX = -1
         self.kingY = -1
+        # Set locked corner cells
+        corners = [(0, 0),
+                   (0, COLS[self.gameIndex] - 1),
+                   (ROWS[self.gameIndex] - 1, 0),
+                   (ROWS[self.gameIndex] - 1, COLS[self.gameIndex] - 1)]
         if 0 == self.gameIndex:
             # Set white
             self.setInitialWhitePos([(0, 3), (0, 4), (0, 5), (1, 4),
@@ -212,9 +225,8 @@ class VikingChessBoard(object):
             # Set king
             self.cell[4][4].isThrone = True
             self.cell[4][4].setBlackKing()
-            # Set target positions for a King to reach
-            self.setTargetPos([(0, 0), (0, 8), (8, 0), (8, 8)])
-
+            # Set target positions for a King to reach - in this game they are the corners
+            self.setTargetPos(corners)
         elif 1 == self.gameIndex:
             # Set target positions for a King to reach
             # NB: this should be done before setting the knight on the board
@@ -242,6 +254,7 @@ class VikingChessBoard(object):
             # Set king
             self.cell[6][6].isThrone = True
             self.cell[6][6].setBlackKing()
+        self.setCornerPos(corners)
     #def setInitialPos(self)
 
     def isGameOver(self):
@@ -338,7 +351,12 @@ class VikingChessBoard(object):
             for x in xrange(minX + 1, maxX):
                 if not self.cell[x][fromCell.y].isEmpty() or self.cell[x][fromCell.y].isThrone:
                     return False
-        # 3. The King can move 3 cells max
+        # 3. Do not allow jumping over and into the white fortress,
+        #    but only if the knight is already in it
+        # 4. Only the King can move to a corner
+        if toCell.isCorner and not fromCell.isBlackKing:
+            return False
+        # 5. The King can move 3 cells max
         if fromCell.isBlackKing and abs(toCell.x - fromCell.x + toCell.y - fromCell.y) > 3:
             return False
         # Otherwise the move is valid
@@ -360,9 +378,9 @@ class VikingChessBoard(object):
             if cx < 0 or cy < 0 or cx >= COLS[self.gameIndex] or cy >= ROWS[self.gameIndex]:
                 continue
             (mx, my) = ((cx + x) / 2, (cy + y) / 2)
-            if curCell.isWhite and cell[cx][cy].isWhite and cell[mx][my].isBlack:
+            if curCell.isWhite and (cell[cx][cy].isWhite or cell[cx][cy].isCorner) and cell[mx][my].isBlack:
                 cell[mx][my].clear()
-            if curCell.isBlack and cell[cx][cy].isBlack and cell[mx][my].isWhite:
+            if curCell.isBlack and (cell[cx][cy].isBlack or cell[cx][cy].isCorner) and cell[mx][my].isWhite:
                 self.whiteCount -= 1
                 cell[mx][my].clear()
     #def checkKilledKnights(self, curCell)
@@ -371,7 +389,6 @@ class VikingChessBoard(object):
 
 class Cell(gtk.ToggleButton):
     def __init__(self, parent, x, y):
-#        gtk.Button.__init__(self, str(x) + ":" + str(y))
         gtk.ToggleButton.__init__(self)
         self.mainWindow = parent
         self.x = x
@@ -383,6 +400,8 @@ class Cell(gtk.ToggleButton):
         self.isBlackKing = False
         self.isThrone = False
         self.isTarget = False
+        self.isCorner = False
+        self.isWhiteFortress = False
         self.setColor(BUTTON_EMPTY_BG_COLOR)
 
     def clear(self):
@@ -444,7 +463,7 @@ class Cell(gtk.ToggleButton):
         print "setThrone"
         self.isThrone = True
         self.set_label("X")
-#class Cell(gtk.Button)
+#class Cell(gtk.ToggleButton)
 
 class HBox(gtk.HBox):
     def __init__(self, x):
