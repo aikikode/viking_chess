@@ -33,6 +33,7 @@ GTK_COLOR_BASE = 65535
 RGB_COLOR_BASE = 255
 BUTTON_EMPTY_BG_COLOR = (215, 152, 36)
 WHITE_KNIGHT_COLOR = (240, 240, 240)
+WHITE_FORTRESS_COLOR = (0, 100, 0)
 BLACK_KNIGHT_COLOR = (50, 50, 50)
 BLACK_KING_COLOR = (10, 10, 10)
 
@@ -161,6 +162,11 @@ class VikingChessBoard(object):
         self.winner = None
         self.whiteTurn = True
 
+    def setInitialWhitePos(self, coordsList):
+        for (x, y) in coordsList:
+            self.cell[x][y].setWhite()
+            self.cell[x][y].setColor(WHITE_FORTRESS_COLOR)
+
     def setInitialPos(self):
         self.kingX = -1
         self.kingY = -1
@@ -168,22 +174,10 @@ class VikingChessBoard(object):
             # Set throne
             self.cell[4][4].isThrone = True
             # Set white
-            self.cell[0][3].setWhite()
-            self.cell[0][4].setWhite()
-            self.cell[0][5].setWhite()
-            self.cell[1][4].setWhite()
-            self.cell[3][0].setWhite()
-            self.cell[4][0].setWhite()
-            self.cell[5][0].setWhite()
-            self.cell[4][1].setWhite()
-            self.cell[3][8].setWhite()
-            self.cell[4][8].setWhite()
-            self.cell[5][8].setWhite()
-            self.cell[4][7].setWhite()
-            self.cell[8][3].setWhite()
-            self.cell[8][4].setWhite()
-            self.cell[8][5].setWhite()
-            self.cell[7][4].setWhite()
+            self.setInitialWhitePos([(0, 3), (0, 4), (0, 5), (1, 4),
+                                     (3, 0), (4, 0), (5, 0), (4, 1),
+                                     (3, 8), (4, 8), (5, 8), (4, 7),
+                                     (8, 3), (8, 4), (8, 5), (7, 4)])
             self.whiteCount = 16
             # Set black
             self.cell[4][4].setBlackKing()
@@ -199,42 +193,10 @@ class VikingChessBoard(object):
             # Set throne
             self.cell[6][6].isThrone = True
             # Set white
-            self.cell[0][4].setWhite()
-            self.cell[0][5].setWhite()
-            self.cell[0][6].setWhite()
-            self.cell[0][7].setWhite()
-            self.cell[0][8].setWhite()
-            self.cell[1][5].setWhite()
-            self.cell[1][7].setWhite()
-            self.cell[2][6].setWhite()
-
-            self.cell[4][0].setWhite()
-            self.cell[5][0].setWhite()
-            self.cell[6][0].setWhite()
-            self.cell[7][0].setWhite()
-            self.cell[8][0].setWhite()
-            self.cell[5][1].setWhite()
-            self.cell[7][1].setWhite()
-            self.cell[6][2].setWhite()
-
-            self.cell[12][4].setWhite()
-            self.cell[12][5].setWhite()
-            self.cell[12][6].setWhite()
-            self.cell[12][7].setWhite()
-            self.cell[12][8].setWhite()
-            self.cell[11][5].setWhite()
-            self.cell[11][7].setWhite()
-            self.cell[10][6].setWhite()
-
-            self.cell[4][12].setWhite()
-            self.cell[5][12].setWhite()
-            self.cell[6][12].setWhite()
-            self.cell[7][12].setWhite()
-            self.cell[8][12].setWhite()
-            self.cell[5][11].setWhite()
-            self.cell[7][11].setWhite()
-            self.cell[6][10].setWhite()
-
+            self.setInitialWhitePos([(0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (1, 5), (1, 7), (2, 6),
+                                     (4, 0), (5, 0), (6, 0), (7, 0), (8, 0), (5, 1), (7, 1), (6, 2),
+                                     (12, 4), (12, 5), (12, 6), (12, 7), (12, 8), (11, 5), (11, 7), (10, 6),
+                                     (4, 12), (5, 12), (6, 12), (7, 12), (8, 12), (5, 11), (7, 11), (6, 10)])
             self.whiteCount = 32
             # Set black
             self.cell[6][6].setBlackKing()
@@ -411,14 +373,12 @@ class Cell(gtk.ToggleButton):
         self.isWhite = False
         self.isBlack = False
         self.isBlackKing = False
-#        self.setColor(BUTTON_EMPTY_BG_COLOR)
         self.set_image(gtk.Image())
 
     def setWhite(self):
         self.isWhite = True
         self.isBlack = False
         self.isBlackKing = False
-#        self.setColor(WHITE_KNIGHT_COLOR)
         pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/white_knight.png")
         scaled_buf = pixbuf.scale_simple(30,30,gtk.gdk.INTERP_BILINEAR)
         image = gtk.Image()
@@ -430,7 +390,6 @@ class Cell(gtk.ToggleButton):
         self.isWhite = False
         self.isBlack = True
         self.isBlackKing = False
-#        self.setColor(BLACK_KNIGHT_COLOR)
         pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/black_knight.png")
         scaled_buf = pixbuf.scale_simple(30,30,gtk.gdk.INTERP_BILINEAR)
         image = gtk.Image()
@@ -444,7 +403,6 @@ class Cell(gtk.ToggleButton):
         self.isBlackKing = True
         self.mainWindow.kingX = self.x
         self.mainWindow.kingY = self.y
-#        self.setColor(BLACK_KING_COLOR)
         pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/circle_red.png")
         scaled_buf = pixbuf.scale_simple(30,30,gtk.gdk.INTERP_BILINEAR)
         image = gtk.Image()
