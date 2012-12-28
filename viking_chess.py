@@ -24,8 +24,6 @@
 # <http://www.gnu.org/licenses>
 #
 
-# TODO: king can fight
-# TODO: on small board 2 white knights are enough to kill the black King (4 - on the throne and 3  - 'with' the throne)
 # TODO: white knight can move inside the fortress, but once it leaves it, it can't return.
 # TODO: no knight or king can move inside the fortress or over it
 # TODO: add game rules
@@ -266,16 +264,13 @@ class VikingChessBoard(object):
         if self.whiteCount <= 0:
             self.winner = "Black"
             return True
-        # Now check if the king is between 4 white knights or
-        # between 3 white knights and a throne
-        for (x, y) in [(self.kingX - 1, self.kingY),
-                       (self.kingX + 1, self.kingY),
-                       (self.kingX, self.kingY - 1),
-                       (self.kingX, self.kingY + 1)]:
-            if not (self.cell[x][y].isWhite or self.cell[x][y].isThrone):
-                return False
-        self.winner = "White"
-        return True
+        # If it was black turn and they couldn't break the check, they loose the game
+        # NB: self.whiteTurn should point to the current turn that just finished!
+        if self.isCheck and not self.whiteTurn:
+            self.winner = "White"
+            return True
+        # In all other cases the game continues
+        return False
     #def isGameOver(self)
 
     # Unpress all buttons except current one
@@ -307,9 +302,11 @@ class VikingChessBoard(object):
                         self.selectedCell.set_label("X")
                     self.selectedCell = None
                     self.checkKilledKnights(cell)
-                    self.whiteTurn = not self.whiteTurn
+                    self.checkClearCheck()
                     # Always check whether anybody won the game after each move
-                    if self.isGameOver():
+                    if not self.isGameOver():  # It's important not to switch turns before calling this function!
+                        self.whiteTurn = not self.whiteTurn # ...now it's safe
+                    else:
                         winner = self.winner
                         winnerDialog = gtk.MessageDialog(
                             parent = None,
@@ -378,12 +375,128 @@ class VikingChessBoard(object):
             if cx < 0 or cy < 0 or cx >= BOARD_SIZE[self.gameIndex] or cy >= BOARD_SIZE[self.gameIndex]:
                 continue
             (mx, my) = ((cx + x) / 2, (cy + y) / 2)
-            if curCell.isWhite and (cell[cx][cy].isWhite or cell[cx][cy].isCorner) and cell[mx][my].isBlack:
-                cell[mx][my].clear()
-            if curCell.isBlack and (cell[cx][cy].isBlack or cell[cx][cy].isCorner) and cell[mx][my].isWhite:
+            if curCell.isWhite and (cell[cx][cy].isWhite or cell[cx][cy].isCorner or cell[cx][cy].isThrone):
+                if cell[mx][my].isBlack:
+                    if not cell[cx][cy].isBlackKing: # black knight can be killed by pushing to the empty throne
+                        cell[mx][my].clear()
+                elif cell[mx][my].isBlackKing:
+                    # Check for 'check': point is we can flag 'check' only after white knight move,
+                    # but unflag it after any move based on king surrounding
+                    #
+                    # Check if the king is on the border -> then it's check
+                    if 0 == mx or BOARD_SIZE[self.gameIndex] - 1 == mx or\
+                       0 == my or BOARD_SIZE[self.gameIndex] - 1 == my:
+                        self.isCheck = True
+                        continue
+                    # This may be a check, usually it is, but we need to check 2 exclusions:
+                    # 1. the king is on the throne and surrounded by white knights
+                    # 2. the king is near the throne and surrounded by white knights from 3 other sides
+                    if cell[mx][my].isThrone:
+                        # 1-st case
+                        for (x, y) in [(self.kingX - 1, self.kingY),
+                                   (self.kingX + 1, self.kingY),
+                                   (self.kingX, self.kingY - 1),
+                                   (self.kingX, self.kingY + 1)]:
+                            if not cell[x][y].isWhite:
+                                break
+                        else:
+                            self.isCheck = True
+                            continue
+                    else:
+                        whiteCounts = 0
+                        isThroneNear = False
+                        for (x, y) in [(self.kingX - 1, self.kingY),
+                                       (self.kingX + 1, self.kingY),
+                                       (self.kingX, self.kingY - 1),
+                                       (self.kingX, self.kingY + 1)]:
+                            if cell[x][y].isWhite:
+                                whiteCounts += 1
+                            elif cell[x][y].isThrone:
+                                isThroneNear = True
+                        if isThroneNear:
+                            # 2-nd case
+                            if whiteCounts == 3:
+                                self.isCheck = True
+                                continue
+                        else:
+                            # Throne is not nearby and the King is between 2 white knights -> it's check
+                            self.isCheck = True
+                            continue
+                    #if cell[mx][my].isThrone
+                #elif cell[mx][my].isBlackKing
+            # Black King can fight too
+            if (curCell.isBlack or curCell.isBlackKing) and\
+               (cell[cx][cy].isBlack or cell[cx][cy].isBlackKing or cell[cx][cy].isCorner or cell[cx][cy].isThrone) and\
+               cell[mx][my].isWhite:
                 self.whiteCount -= 1
                 cell[mx][my].clear()
     #def checkKilledKnights(self, curCell)
+
+    def checkClearCheck(self):
+        """ Try to clear isCheck flag """
+        cell = self.cell
+        kingX = self.kingX
+        kingY = self.kingY
+        gameIndex = self.gameIndex
+        # If the king is in the corner there's no check
+        if cell[kingX][kingY].isCorner:
+            self.isCheck = False
+            return
+        # If the king is near the border and is not surrounded from 2 sides -> no check
+        if 0 == kingX or BOARD_SIZE[gameIndex] - 1 == kingX:
+            if not cell[kingX][kingY - 1].isWhite or\
+                not cell[kingX][kingY + 1].isWhite:
+                self.isCheck = False
+                return
+            else:
+                return
+        elif 0 == kingY or BOARD_SIZE[gameIndex] - 1 == kingY:
+            if not cell[kingX - 1][kingY].isWhite or\
+                not cell[kingX + 1][kingY].isWhite:
+                self.isCheck = False
+                return
+            else:
+                return
+        # No we know that the king is not near the border
+        # Check whether we are surrounded on the throne
+        if cell[kingX][kingY].isThrone:
+            for (x, y) in [(kingX - 1, kingY),
+                           (kingX + 1, kingY),
+                           (kingX, kingY - 1),
+                           (kingX, kingY + 1)]:
+                if not cell[x][y].isWhite:
+                    self.isCheck = False
+                    return
+        else:
+            # check whether we are near the throne
+            whiteCounts = 0
+            isThroneNear = False
+            for (x, y) in [(kingX - 1, kingY),
+                           (kingX + 1, kingY),
+                           (kingX, kingY - 1),
+                           (kingX, kingY + 1)]:
+                if cell[x][y].isWhite:
+                    whiteCounts += 1
+                elif cell[x][y].isThrone:
+                    isThroneNear = True
+            if isThroneNear:
+                if whiteCounts < 3:
+                    self.isCheck = False
+                    return
+            else:
+                # Throne is not nearby
+                if whiteCounts < 2:
+                    # King cannot be under check with one white knight
+                    self.isCheck = False
+                    return
+                else:
+                    # Is the king not between two white knights?
+                    if not ((cell[kingX - 1][kingY].isWhite and cell[kingX + 1][kingY].isWhite) or
+                            (cell[kingX][kingY - 1].isWhite and cell[kingX][kingY + 1].isWhite)):
+                        self.isCheck = False
+                        return
+        #if cell[kingX][kingY].isThrone
+    #def checkClearCheck(self)
 #class VikingChess(object)
 
 
