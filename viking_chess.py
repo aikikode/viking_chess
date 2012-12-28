@@ -24,10 +24,10 @@
 # <http://www.gnu.org/licenses>
 #
 
-# TODO: add game rules
-
 import sys
 import pygtk
+import pango
+
 pygtk.require('2.0')
 import gtk
 
@@ -62,7 +62,7 @@ class MainWindow(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self)
         self.connect("delete-event", gtk.main_quit) # Prevent application hanging after closing the window
-        self.set_keep_above(True)
+        self.set_keep_above(False)
         self.set_title("Viking Chess")
         self.set_position(gtk.WIN_POS_CENTER)
         self.set_resizable(False)
@@ -73,19 +73,64 @@ class MainWindow(gtk.Window):
         btStartLocalGame.connect("clicked", self.startLocalGameSetup, None)
         hbox = gtk.HBox(True, 3)
         hbox.pack_start(btStartLocalGame, False, False, 15)
+        # Make another button - for help/rules
+        btHelp = gtk.Button(label="Game Rules")
+        btHelp.set_size_request(200, 50)
+        btHelp.connect("clicked", self.showHelp, None)
+        hbox2 = gtk.HBox(True, 3)
+        hbox2.pack_start(btHelp, False, False, 15)
+
         vbox = gtk.VBox(False, 5)
         vbox.pack_start(hbox, False, False, 15)
+        vbox.pack_end(hbox2, False, False, 15)
         self.add(vbox)
 
         # Show all controls
-        btStartLocalGame.show()
-        hbox.show()
-        vbox.show()
+        vbox.show_all()
     #def __init__(self)
 
     def startLocalGameSetup(self, widget, data = None):
         self.destroy()
         LocalGameSetup().show()
+
+    def showHelp(self, widget, data=None):
+        window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        window.set_resizable(True)
+        window.set_title("Viking Chess Rules")
+        window.set_border_width(0)
+
+        box1 = gtk.VBox(False, 0)
+        window.add(box1)
+        box1.show()
+
+        box2 = gtk.VBox(False, 10)
+        box2.set_border_width(10)
+        box1.pack_start(box2, True, True, 0)
+        box2.show()
+
+        sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        textview = gtk.TextView()
+        fontdesc = pango.FontDescription("monospace")
+        textview.modify_font(fontdesc)
+        textview.set_editable(False)
+        textbuffer = textview.get_buffer()
+        sw.add(textview)
+        sw.show()
+        textview.show()
+
+        box2.pack_start(sw)
+        # Load the file textview-basic.py into the text window
+        infile = open("README.md", "r")
+
+        if infile:
+            string = infile.read()
+            infile.close()
+            textbuffer.set_text(string)
+        window.set_size_request(730, 550)
+        window.set_position(gtk.WIN_POS_CENTER)
+        window.show()
+    #def showHelp(self, widget, data=None)
 #class MainWindow(gtk.Window)
 
 class LocalGameSetup(gtk.Window):
