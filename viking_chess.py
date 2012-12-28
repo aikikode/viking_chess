@@ -36,6 +36,9 @@ WHITE_KNIGHT_COLOR = (240, 240, 240)
 BLACK_KNIGHT_COLOR = (50, 50, 50)
 BLACK_KING_COLOR = (10, 10, 10)
 
+settings = gtk.settings_get_default()
+settings.props.gtk_button_images = True
+
 def rgb_to_gtk_simple(rgb_color): return GTK_COLOR_BASE * rgb_color / RGB_COLOR_BASE
 
 def RGB_TO_GTK(rgb_color_tuple):
@@ -409,6 +412,7 @@ class Cell(gtk.ToggleButton):
         self.isBlack = False
         self.isBlackKing = False
         self.setColor(BUTTON_EMPTY_BG_COLOR)
+        self.set_image(gtk.Image())
 
     def setWhite(self):
         self.set_label("W")
@@ -425,13 +429,18 @@ class Cell(gtk.ToggleButton):
         self.setColor(BLACK_KNIGHT_COLOR)
 
     def setBlackKing(self):
-        self.set_label("BK")
+        self.set_label("")
         self.isWhite = False
         self.isBlack = False
         self.isBlackKing = True
         self.mainWindow.kingX = self.x
         self.mainWindow.kingY = self.y
         self.setColor(BLACK_KING_COLOR)
+        pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/circle_red.png")
+        scaled_buf = pixbuf.scale_simple(30,30,gtk.gdk.INTERP_BILINEAR)
+        image = gtk.Image()
+        image.set_from_pixbuf(scaled_buf)
+        self.set_image(image)
 
     def setColor(self, newColor):
         # Make a gdk.color
