@@ -133,6 +133,7 @@ class MainWindow(gtk.Window):
     #def showHelp(self, widget, data=None)
 #class MainWindow(gtk.Window)
 
+##############################################################################
 class LocalGameSetup(gtk.Window):
     """ Settings window shown just before game start:
         choose game field size and other options """
@@ -179,7 +180,9 @@ class LocalGameSetup(gtk.Window):
         index = self.cboxBoardSize.get_active()
         self.destroy()
         VikingChessBoard(index).startGame()
+#class LocalGameSetup(gtk.Window)
 
+##############################################################################
 class VikingChessBoard(object):
     def __init__(self, gameIndex):
         self.gameIndex = gameIndex
@@ -418,43 +421,7 @@ class VikingChessBoard(object):
                 self.selectedCell = cell
             else: # move the knight if possible
                 if self.selectedCell is not None and self.isValidMove(cell):
-                    self.logMove(self.whiteTurn, self.selectedCell, cell)
-                    if self.selectedCell.isWhite:
-                        cell.setWhite()
-                    elif self.selectedCell.isBlack:
-                        cell.setBlack()
-                    elif self.selectedCell.isBlackKing:
-                        cell.setBlackKing()
-                    cell.set_active(False)
-                    self.selectedCell.clear()
-                    if self.selectedCell.isThrone:
-                        # The king just moved from the Throne -
-                        # set special label to indicate the Throne
-                        self.selectedCell.set_label("X")
-                    self.selectedCell.set_active(False)
-                    self.checkKilledKnights(cell)
-                    self.checkClearCheck()
-                    # Always check whether anybody won the game after each move
-                    if not self.isGameOver():  # It's important not to switch turns before calling this function!
-                        self.whiteTurn = not self.whiteTurn # ...now it's safe
-                        whoseTurn = "White" if self.whiteTurn else "Black"
-                        self.mainWindow.set_title("Viking Chess - " + whoseTurn)
-                    else:
-                        self.mainWindow.set_title("Viking Chess - " + self.winner + " won!")
-                        winner = self.winner
-                        winnerDialog = gtk.MessageDialog(
-                            parent = None,
-                            flags = gtk.DIALOG_DESTROY_WITH_PARENT,
-                            type = gtk.MESSAGE_INFO,
-                            buttons = gtk.BUTTONS_OK,
-                            message_format = self.winner + " won!"
-                        )
-                        winnerDialog.set_title("Round complete!")
-                        winnerDialog.connect('response', lambda dialog, response: self.startGame())
-                        winnerDialog.set_position(gtk.WIN_POS_CENTER)
-                        winnerDialog.set_keep_above(True)
-                        winnerDialog.run()
-                        winnerDialog.destroy()
+                    self.performMove(self.selectedCell, cell)
                 else:
                     cell.set_active(False)
         else:
@@ -506,6 +473,32 @@ class VikingChessBoard(object):
             return False
         # Otherwise the move is valid
         return True
+
+    def performMove(self, fromCell, toCell):
+        self.logMove(self.whiteTurn, fromCell, toCell)
+        if fromCell.isWhite:
+            toCell.setWhite()
+        elif fromCell.isBlack:
+            toCell.setBlack()
+        elif fromCell.isBlackKing:
+            toCell.setBlackKing()
+        toCell.set_active(False)
+        fromCell.clear()
+        if fromCell.isThrone:
+            # The king just moved from the Throne -
+            # set special label to indicate the Throne
+            fromCell.set_label("X")
+        fromCell.set_active(False)
+        self.checkKilledKnights(toCell)
+        self.checkClearCheck()
+        # Always check whether anybody won the game after each move
+        if not self.isGameOver():  # It's important not to switch turns before calling this function!
+            self.whiteTurn = not self.whiteTurn # ...now it's safe
+            whoseTurn = "White" if self.whiteTurn else "Black"
+            self.mainWindow.set_title("Viking Chess - " + whoseTurn)
+        else:
+            self.showGameOverDialog()
+    #def performMove(self, fromCell, toCell)
 
     def checkKilledKnights(self, curCell):
         # We need to check only the cross 5x5 with the center in the current cell:
@@ -680,9 +673,39 @@ class VikingChessBoard(object):
                         return
         #if cell[kingX][kingY].isThrone
     #def checkClearCheck(self)
-#class VikingChess(object)
+
+    def showGameOverDialog(self):
+        self.mainWindow.set_title("Viking Chess - " + self.winner + " won!")
+        winner = self.winner
+        winnerDialog = gtk.MessageDialog(
+            parent = None,
+            flags = gtk.DIALOG_DESTROY_WITH_PARENT,
+            type = gtk.MESSAGE_INFO,
+            buttons = gtk.BUTTONS_OK,
+            message_format = self.winner + " won!"
+        )
+        winnerDialog.set_title("Round complete!")
+        winnerDialog.connect('response', lambda dialog, response: self.startGame())
+        winnerDialog.set_position(gtk.WIN_POS_CENTER)
+        winnerDialog.set_keep_above(True)
+        winnerDialog.run()
+        winnerDialog.destroy()
+    #def showGameOverDialog(self)
+#class VikingChessBoard(object)
 
 
+##############################################################################
+class VikingChessBoardOnline(VikingChessBoard):
+    # Override buttonClicked() according to client/server behaviour
+    # to send data about the move to the other player.
+    #
+    # Call performMove() on receiving the data from client/server
+    # to move the knight like the other player did.
+    pass
+#class VikingChessBoardOnline(VikingChessBoard)
+
+
+##############################################################################
 class Cell(gtk.ToggleButton):
     def __init__(self, parent, x, y):
         gtk.ToggleButton.__init__(self)
