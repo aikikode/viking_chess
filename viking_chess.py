@@ -139,7 +139,7 @@ class LocalGameSetup(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self)
         self.connect("delete-event", self.startMainMenu)
-        self.set_keep_above(True)
+        self.set_keep_above(False)
         self.set_title("Setup")
         self.set_position(gtk.WIN_POS_CENTER)
         self.set_resizable(False)
@@ -186,24 +186,83 @@ class VikingChessBoard(object):
         self.whiteCount = 0
         self.mainWindow = mainWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
         mainWindow.connect("delete-event", self.onClose)
-        mainWindow.set_keep_above(True)
+        mainWindow.set_keep_above(False)
         self.mainWindow.set_title("Viking Chess - White")
         mainWindow.set_resizable(False)
-        self.vbox = gtk.VBox()
-        self.hbox = [HBox(x) for x in xrange(BOARD_SIZE[self.gameIndex])]
-        [self.vbox.pack_start(self.hbox[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
 
-        # Place the board on the window
+        vboxBoard = gtk.VBox()
+        hbox = [gtk.HBox() for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [vboxBoard.pack_start(hbox[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        # Define cells and connect them to button click
         self.cell = [[Cell(self, x, y) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
-        [[self.hbox[x].pack_start(self.cell[x][y]) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
-        mainWindow.add(self.vbox)
-        self.vbox.show()
-        [self.hbox[x].show() for x in xrange(BOARD_SIZE[self.gameIndex])]
         [[self.cell[x][y].connect("clicked", self.buttonClicked, None) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
-        [[self.cell[x][y].show() for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
+        # Place the cells in HBox containers
+        [[hbox[y].pack_start(self.cell[x][BOARD_SIZE[self.gameIndex] - 1 - y]) for x in xrange(BOARD_SIZE[self.gameIndex])] for y in xrange(BOARD_SIZE[self.gameIndex])]
 
+        # X axises from below and from above the board
+        hboxXAxisBelow = gtk.HBox()
+        xAxis = [gtk.Label(chr(ord('a') + x)) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [hboxXAxisBelow.pack_start(xAxis[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        hboxXAxisAbove = gtk.HBox()
+        xAxis = [gtk.Label(chr(ord('a') + x)) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [hboxXAxisAbove.pack_start(xAxis[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        # Y axises from the left and from the right of the board
+        vboxYAxisLeft = gtk.VBox()
+        yAxis = [gtk.Label(y + 1) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        [vboxYAxisLeft.pack_end(yAxis[y]) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        vboxYAxisRight = gtk.VBox()
+        yAxis = [gtk.Label(y + 1) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        [vboxYAxisRight.pack_end(yAxis[y]) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        # Log text view
+        sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        textview = gtk.TextView()
+        fontdesc = pango.FontDescription("monospace")
+        textview.modify_font(fontdesc)
+        textview.set_editable(False)
+        self.textbuffer = textview.get_buffer()
+        sw.add(textview)
+        sw.set_size_request(200, 50)
+        sw.set_border_width(3)
+        # Pack the board and axises in one large container - table
+        table = gtk.Table(3, 4, False)
+        table.attach(gtk.Label(), 0, 1, 0, 1)
+        table.attach(hboxXAxisAbove, 1, 2, 0, 1)
+        table.attach(gtk.Label(), 2, 3, 0, 1)
+        table.attach(vboxYAxisLeft, 0, 1, 1, 2)
+        table.attach(vboxBoard, 1, 2, 1, 2)
+        table.attach(vboxYAxisRight, 2, 3, 1, 2)
+        table.attach(gtk.Label(), 0, 1, 2, 3)
+        table.attach(hboxXAxisBelow, 1, 2, 2, 3)
+        table.attach(gtk.Label(), 2, 3, 2, 3)
+        table.attach(gtk.Label(), 2, 3, 2, 3)
+        table.attach(gtk.Label("Moves Performed:"), 3, 4, 0, 1)
+        table.attach(sw, 3, 4, 1, 3)
+        table.set_border_width(3)
+
+        mainWindow.add(table)
         # Center the window
         self.mainWindow.set_position(gtk.WIN_POS_CENTER)
+
+    def coordToText(self, x, y):
+        return chr(ord('a') + x) + str(y + 1)
+
+    def logMessage(self, message):
+        iter = self.textbuffer.get_end_iter()
+        iter.backward_char()
+        self.textbuffer.insert(iter, message)
+    def logMove(self, isWhite, fromCell, toCell):
+        self.movesCount += 1
+        who = "W" if isWhite else "B"
+        self.textbuffer.insert(self.textbuffer.get_end_iter(),
+            str(self.movesCount) + ". " + who + ": " +
+            self.coordToText(fromCell.x, fromCell.y) +
+            " -> " +
+            self.coordToText(toCell.x, toCell.y) +
+            ";\n")
+    def clearLog(self):
+        self.movesCount = 0
+        self.textbuffer.set_text("")
 
     def onClose(self, widget, data=None):
         dialog = gtk.MessageDialog(self.mainWindow,
@@ -223,7 +282,8 @@ class VikingChessBoard(object):
 
 
     def startGame(self):
-        self.mainWindow.show()
+        self.mainWindow.show_all()
+        self.clearLog()
         self.clearAllCells()
         self.setInitialPos()
         self.selectedCell = None
@@ -358,6 +418,7 @@ class VikingChessBoard(object):
                 self.selectedCell = cell
             else: # move the knight if possible
                 if self.selectedCell is not None and self.isValidMove(cell):
+                    self.logMove(self.whiteTurn, self.selectedCell, cell)
                     if self.selectedCell.isWhite:
                         cell.setWhite()
                     elif self.selectedCell.isBlack:
@@ -466,6 +527,7 @@ class VikingChessBoard(object):
                 if cell[mx][my].isBlack:
                     if not cell[cx][cy].isBlackKing: # black knight can be killed by pushing to the empty throne
                         cell[mx][my].clear()
+                        self.logMessage(" -" + self.coordToText(mx, my))
                 elif cell[mx][my].isBlackKing:
                     # Check for 'check': point is we can flag 'check' only after white knight move,
                     # but unflag it after any move based on king surrounding
@@ -474,6 +536,7 @@ class VikingChessBoard(object):
                     if 0 == mx or BOARD_SIZE[self.gameIndex] - 1 == mx or\
                        0 == my or BOARD_SIZE[self.gameIndex] - 1 == my:
                         self.isCheck = True
+                        self.logMessage(" Check!")
                         self.showCheckWarn()
                         continue
                     # This may be a check, usually it is, but we need to check 2 exclusions:
@@ -489,6 +552,7 @@ class VikingChessBoard(object):
                                 break
                         else:
                             self.isCheck = True
+                            self.logMessage(" Check!")
                             self.showCheckWarn()
                             continue
                     else:
@@ -506,11 +570,13 @@ class VikingChessBoard(object):
                             # 2-nd case
                             if whiteCounts == 3:
                                 self.isCheck = True
+                                self.logMessage(" Check!")
                                 self.showCheckWarn()
                                 continue
                         else:
                             # Throne is not nearby and the King is between 2 white knights -> it's check
                             self.isCheck = True
+                            self.logMessage(" Check!")
                             self.showCheckWarn()
                             continue
                     #if cell[mx][my].isThrone
@@ -522,6 +588,7 @@ class VikingChessBoard(object):
                cell[mx][my].isWhite:
                 self.whiteCount -= 1
                 cell[mx][my].clear()
+                self.logMessage(" -" + self.coordToText(mx, my))
             # Special situation: white can kill a black knight if it is surrounded
             # from 3 sides and the black king if from the 4-th side
             if curCell.isWhite and cell[cx][cy].isBlackKing and cell[mx][my].isBlack:
@@ -531,9 +598,11 @@ class VikingChessBoard(object):
                     if cx == mx:
                         if cell[mx - 1][my].isWhite and cell[mx + 1][my].isWhite:
                             cell[mx][my].clear()
+                            self.logMessage(" -" + self.coordToText(mx, my))
                     elif cy == my:
                         if cell[mx][my - 1].isWhite and cell[mx][my + 1].isWhite:
                             cell[mx][my].clear()
+                            self.logMessage(" -" + self.coordToText(mx, my))
     #def checkKilledKnights(self, curCell)
 
     def showCheckWarn(self):
@@ -697,10 +766,6 @@ class Cell(gtk.ToggleButton):
         self.isThrone = True
         self.set_label("X")
 #class Cell(gtk.ToggleButton)
-
-class HBox(gtk.HBox):
-    def __init__(self, x):
-        gtk.HBox.__init__(self, str(x))
 
 
 ##############################################################################
