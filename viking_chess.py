@@ -197,7 +197,7 @@ class VikingChessBoard(object):
         self.cell = [[Cell(self, x, y) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
         [[self.cell[x][y].connect("clicked", self.buttonClicked, None) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
         # Place the cells in HBox containers
-        [[hbox[x].pack_start(self.cell[y][x]) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [[hbox[y].pack_start(self.cell[x][BOARD_SIZE[self.gameIndex] - 1 - y]) for x in xrange(BOARD_SIZE[self.gameIndex])] for y in xrange(BOARD_SIZE[self.gameIndex])]
 
         # X axises from below and from above the board
         hboxXAxisBelow = gtk.HBox()
@@ -208,11 +208,11 @@ class VikingChessBoard(object):
         [hboxXAxisAbove.pack_start(xAxis[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
         # Y axises from the left and from the right of the board
         vboxYAxisLeft = gtk.VBox()
-        yAxis = [gtk.Label(y) for y in xrange(BOARD_SIZE[self.gameIndex])]
-        [vboxYAxisLeft.pack_start(yAxis[y]) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        yAxis = [gtk.Label(y + 1) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        [vboxYAxisLeft.pack_end(yAxis[y]) for y in xrange(BOARD_SIZE[self.gameIndex])]
         vboxYAxisRight = gtk.VBox()
-        yAxis = [gtk.Label(y) for y in xrange(BOARD_SIZE[self.gameIndex])]
-        [vboxYAxisRight.pack_start(yAxis[y]) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        yAxis = [gtk.Label(y + 1) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        [vboxYAxisRight.pack_end(yAxis[y]) for y in xrange(BOARD_SIZE[self.gameIndex])]
         # Log text view
         sw = gtk.ScrolledWindow()
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
@@ -244,6 +244,9 @@ class VikingChessBoard(object):
         # Center the window
         self.mainWindow.set_position(gtk.WIN_POS_CENTER)
 
+    def coordToText(self, x, y):
+        return chr(ord('a') + x) + str(y + 1)
+
     def logMessage(self, message):
         iter = self.textbuffer.get_end_iter()
         iter.backward_char()
@@ -253,8 +256,10 @@ class VikingChessBoard(object):
         who = "W" if isWhite else "B"
         self.textbuffer.insert(self.textbuffer.get_end_iter(),
             str(self.movesCount) + ". " + who + ": " +
-            chr(ord('a') + fromCell.x) + str(fromCell.y) +
-            " -> " + chr(ord('a') + toCell.x) + str(toCell.y) + ";\n")
+            self.coordToText(fromCell.x, fromCell.y) +
+            " -> " +
+            self.coordToText(toCell.x, toCell.y) +
+            ";\n")
     def clearLog(self):
         self.movesCount = 0
         self.textbuffer.set_text("")
@@ -522,7 +527,7 @@ class VikingChessBoard(object):
                 if cell[mx][my].isBlack:
                     if not cell[cx][cy].isBlackKing: # black knight can be killed by pushing to the empty throne
                         cell[mx][my].clear()
-                        self.logMessage(" -" + chr(ord('a') + mx) + str(my))
+                        self.logMessage(" -" + self.coordToText(mx, my))
                 elif cell[mx][my].isBlackKing:
                     # Check for 'check': point is we can flag 'check' only after white knight move,
                     # but unflag it after any move based on king surrounding
@@ -583,7 +588,7 @@ class VikingChessBoard(object):
                cell[mx][my].isWhite:
                 self.whiteCount -= 1
                 cell[mx][my].clear()
-                self.logMessage(" -" + chr(ord('a') + mx) + str(my))
+                self.logMessage(" -" + self.coordToText(mx, my))
             # Special situation: white can kill a black knight if it is surrounded
             # from 3 sides and the black king if from the 4-th side
             if curCell.isWhite and cell[cx][cy].isBlackKing and cell[mx][my].isBlack:
@@ -593,11 +598,11 @@ class VikingChessBoard(object):
                     if cx == mx:
                         if cell[mx - 1][my].isWhite and cell[mx + 1][my].isWhite:
                             cell[mx][my].clear()
-                            self.logMessage(" -" + chr(ord('a') + mx) + str(my))
+                            self.logMessage(" -" + self.coordToText(mx, my))
                     elif cy == my:
                         if cell[mx][my - 1].isWhite and cell[mx][my + 1].isWhite:
                             cell[mx][my].clear()
-                            self.logMessage(" -" + chr(ord('a') + mx) + str(my))
+                            self.logMessage(" -" + self.coordToText(mx, my))
     #def checkKilledKnights(self, curCell)
 
     def showCheckWarn(self):
