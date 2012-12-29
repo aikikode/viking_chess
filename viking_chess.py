@@ -191,7 +191,7 @@ class VikingChessBoard(object):
         mainWindow.set_resizable(False)
 
         vboxBoard = gtk.VBox()
-        hbox = [HBox(x) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        hbox = [gtk.HBox() for x in xrange(BOARD_SIZE[self.gameIndex])]
         [vboxBoard.pack_start(hbox[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
         # Define cells and connect them to button click
         self.cell = [[Cell(self, x, y) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
@@ -766,10 +766,6 @@ class Cell(gtk.ToggleButton):
         self.isThrone = True
         self.set_label("X")
 #class Cell(gtk.ToggleButton)
-
-class HBox(gtk.HBox):
-    def __init__(self, x):
-        gtk.HBox.__init__(self, str(x))
 
 
 ##############################################################################
