@@ -217,13 +217,14 @@ class VikingChessBoard(object):
         yAxis = [gtk.Label(y + 1) for y in xrange(BOARD_SIZE[self.gameIndex])]
         [vboxYAxisRight.pack_end(yAxis[y]) for y in xrange(BOARD_SIZE[self.gameIndex])]
         # Log text view
-        sw = gtk.ScrolledWindow()
+        self.sw = sw = gtk.ScrolledWindow()
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         textview = gtk.TextView()
         fontdesc = pango.FontDescription("monospace")
         textview.modify_font(fontdesc)
         textview.set_editable(False)
         self.textbuffer = textview.get_buffer()
+        self.textbuffer.connect('changed', self.scrollLog)
         sw.add(textview)
         sw.set_size_request(200, 50)
         sw.set_border_width(3)
@@ -250,6 +251,9 @@ class VikingChessBoard(object):
     def coordToText(self, x, y):
         return chr(ord('a') + x) + str(y + 1)
 
+    def scrollLog(self, widget, data=None):
+        adj = self.sw.get_vadjustment()
+        adj.set_value(adj.upper - adj.page_size)
     def logMessage(self, message):
         iter = self.textbuffer.get_end_iter()
         iter.backward_char()
