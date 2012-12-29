@@ -139,7 +139,7 @@ class LocalGameSetup(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self)
         self.connect("delete-event", self.startMainMenu)
-        self.set_keep_above(True)
+        self.set_keep_above(False)
         self.set_title("Setup")
         self.set_position(gtk.WIN_POS_CENTER)
         self.set_resizable(False)
@@ -186,21 +186,46 @@ class VikingChessBoard(object):
         self.whiteCount = 0
         self.mainWindow = mainWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
         mainWindow.connect("delete-event", self.onClose)
-        mainWindow.set_keep_above(True)
+        mainWindow.set_keep_above(False)
         self.mainWindow.set_title("Viking Chess - White")
         mainWindow.set_resizable(False)
-        self.vbox = gtk.VBox()
-        self.hbox = [HBox(x) for x in xrange(BOARD_SIZE[self.gameIndex])]
-        [self.vbox.pack_start(self.hbox[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
 
-        # Place the board on the window
+        vboxBoard = gtk.VBox()
+        hbox = [HBox(x) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [vboxBoard.pack_start(hbox[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        # Define cells and connect them to button click
         self.cell = [[Cell(self, x, y) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
-        [[self.hbox[x].pack_start(self.cell[x][y]) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
-        mainWindow.add(self.vbox)
-        self.vbox.show()
-        [self.hbox[x].show() for x in xrange(BOARD_SIZE[self.gameIndex])]
         [[self.cell[x][y].connect("clicked", self.buttonClicked, None) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
-        [[self.cell[x][y].show() for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
+        # Place the cells in HBox containers
+        [[hbox[x].pack_start(self.cell[x][y]) for y in xrange(BOARD_SIZE[self.gameIndex])] for x in xrange(BOARD_SIZE[self.gameIndex])]
+
+        # X axises from below and from above the board
+        hboxXAxisBelow = gtk.HBox()
+        xAxis = [gtk.Label(chr(ord('a') + x)) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [hboxXAxisBelow.pack_start(xAxis[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        hboxXAxisAbove = gtk.HBox()
+        xAxis = [gtk.Label(chr(ord('a') + x)) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [hboxXAxisAbove.pack_start(xAxis[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        # Y axises from the left and from the right of the board
+        vboxYAxisLeft = gtk.VBox()
+        yAxis = [gtk.Label(y) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        [vboxYAxisLeft.pack_start(yAxis[y]) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        vboxYAxisRight = gtk.VBox()
+        yAxis = [gtk.Label(y) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        [vboxYAxisRight.pack_start(yAxis[y]) for y in xrange(BOARD_SIZE[self.gameIndex])]
+        # Pack the board and axises in one large container - table
+        table = gtk.Table(3, 2, False)
+        table.attach(gtk.Label(), 0, 1, 0, 1)
+        table.attach(hboxXAxisAbove, 1, 2, 0, 1)
+        table.attach(gtk.Label(), 2, 3, 0, 1)
+        table.attach(vboxYAxisLeft, 0, 1, 1, 2)
+        table.attach(vboxBoard, 1, 2, 1, 2)
+        table.attach(vboxYAxisRight, 2, 3, 1, 2)
+        table.attach(gtk.Label(), 0, 1, 2, 3)
+        table.attach(hboxXAxisBelow, 1, 2, 2, 3)
+        table.attach(gtk.Label(), 2, 3, 2, 3)
+
+        mainWindow.add(table)
 
         # Center the window
         self.mainWindow.set_position(gtk.WIN_POS_CENTER)
@@ -223,7 +248,7 @@ class VikingChessBoard(object):
 
 
     def startGame(self):
-        self.mainWindow.show()
+        self.mainWindow.show_all()
         self.clearAllCells()
         self.setInitialPos()
         self.selectedCell = None
