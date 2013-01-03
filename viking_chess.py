@@ -23,17 +23,30 @@
 # License version 3 and version 2.1 along with this program.  If not, see
 # <http://www.gnu.org/licenses>
 #
+import socket
 
 import sys
 import pygtk
-import pango
+import threading
+import time
 
 pygtk.require('2.0')
+import pango
 import gtk
+import SocketServer
+
+gtk.gdk.threads_init()
 
 VERSION = "0.0.1"
 
 BOARD_SIZE = (9, 13)  # all boards are square -> no need to store 2 dimensions
+
+SERVER_HOST = '127.0.0.1'
+SERVER_PORT = 8000
+SERVER_ADDRESS = (SERVER_HOST, SERVER_PORT)
+SERVER = None
+VBO = None
+TO_SEND = None
 
 # Colors definitions (in 256-base RGB)
 BUTTON_EMPTY_BG_COLOR = (215, 152,  36)   # initially empty cell
@@ -61,37 +74,89 @@ class MainWindow(gtk.Window):
         start a server or connect to existing one """
     def __init__(self):
         gtk.Window.__init__(self)
-        self.connect("delete-event", gtk.main_quit) # Prevent application hanging after closing the window
+        self.connect("delete-event", main_quit) # Prevent application hanging after closing the window
         self.set_keep_above(False)
         self.set_title("Viking Chess")
         self.set_position(gtk.WIN_POS_CENTER)
         self.set_resizable(False)
 
-        # Put button in HBox and put that HBox in VBox to get some space
+        # Put buttons in VBox and put that VBox in HBox to get some space between buttons
         btStartLocalGame = gtk.Button(label="Start Local Game")
         btStartLocalGame.set_size_request(200, 50)
         btStartLocalGame.connect("clicked", self.startLocalGameSetup, None)
-        hbox = gtk.HBox(True, 3)
-        hbox.pack_start(btStartLocalGame, False, False, 15)
-        # Make another button - for help/rules
+        vbox = gtk.VBox(True, 3)
+        vbox.pack_start(btStartLocalGame, False, False, 15)
+        # Add another button for server start
+        btServer = gtk.Button(label="Start Server")
+        btServer.set_size_request(200, 50)
+        btServer.connect("clicked", self.showServerSetup, None)
+        vbox.pack_start(btServer, False, False, 0)
+        # Add another button - for client connect
+        btClient = gtk.Button(label="Connect")
+        btClient.set_size_request(200, 50)
+        btClient.connect("clicked", self.showClientSetup, None)
+        vbox.pack_start(btClient, False, False, 0)
+        # Add another button - for help/rules
         btHelp = gtk.Button(label="Game Rules")
         btHelp.set_size_request(200, 50)
         btHelp.connect("clicked", self.showHelp, None)
-        hbox2 = gtk.HBox(True, 3)
-        hbox2.pack_start(btHelp, False, False, 15)
+        vbox.pack_start(btHelp, False, False, 0)
 
-        vbox = gtk.VBox(False, 5)
-        vbox.pack_start(hbox, False, False, 15)
-        vbox.pack_end(hbox2, False, False, 15)
-        self.add(vbox)
+        hbox = gtk.HBox(False, 5)
+        hbox.pack_start(vbox, False, False, 15)
+        self.add(hbox)
 
         # Show all controls
-        vbox.show_all()
+        hbox.show_all()
     #def __init__(self)
 
     def startLocalGameSetup(self, widget, data = None):
         self.destroy()
-        LocalGameSetup().show()
+        LocalGameSetup()
+
+    def showServerSetup(self, widget, data = None):
+        self.destroy()
+        ServerSetup()
+
+    def showClientSetup(self, widget, data = None):
+        # TODO: make a real setup window
+        self.destroy()
+        print "Start Client Board"
+        global VBO
+        VBO = VikingChessBoardOnline()
+        VBO.startGame()
+        VBO.whiteTurn = False
+        VBO.isServer = False
+        threading.Thread(target=self.clientSocketThread).start()
+
+    def clientSocketThread(self):
+        # creating socket ...
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # ... and connecting to the server
+        client_socket.connect(SERVER_ADDRESS)
+        # send hello message and receive echo
+        client_socket.send("Hello\n")
+        global TO_SEND
+        TO_SEND = None
+        while True:
+            VBO.whiteTurn = not VBO.whiteTurn
+            data = client_socket.recv(1024).strip()
+            print "Client: recv: " + data
+            if data != "Bye":
+                from_cell_x, from_cell_y, to_cell_x, to_cell_y = data.split(':')
+                VBO.performMove(int(from_cell_x), int(from_cell_y), int(to_cell_x), int(to_cell_y))
+                while TO_SEND is None:
+                    time.sleep(1)
+                client_socket.send(TO_SEND + "\n")
+                print "Client: send: " + TO_SEND
+                if TO_SEND == "Bye":
+                    break
+                else:
+                    TO_SEND = None
+            else:
+                break
+        client_socket.close()
+
 
     def showHelp(self, widget, data=None):
         window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -161,14 +226,8 @@ class LocalGameSetup(gtk.Window):
         vbox.pack_start(hbox, False, False, 5)
         vbox.pack_end(hbox2, False, False, 5)
         self.add(vbox)
-
         # Show all controls
-        lblBoardSize.show()
-        self.cboxBoardSize.show()
-        btStartGame.show()
-        hbox.show()
-        hbox2.show()
-        vbox.show()
+        self.show_all()
     #def __init__(self)
 
     def startMainMenu(self, widget, data=None):
@@ -182,9 +241,65 @@ class LocalGameSetup(gtk.Window):
         VikingChessBoard(index).startGame()
 #class LocalGameSetup(gtk.Window)
 
+class ServerSetup(gtk.Window):
+    def __init__(self):
+        gtk.Window.__init__(self)
+        self.connect("delete-event", self.startMainMenu)
+        self.set_resizable(True)
+        self.set_title("Viking Chess Server Setup")
+        self.set_border_width(0)
+        self.set_position(gtk.WIN_POS_CENTER)
+
+        lblBoardSize = gtk.Label("Set board size:")
+        self.cboxBoardSize = gtk.combo_box_new_text()
+        self.cboxBoardSize.append_text(str(BOARD_SIZE[0]) + " x " + str(BOARD_SIZE[0]))
+        self.cboxBoardSize.append_text(str(BOARD_SIZE[1]) + " x " + str(BOARD_SIZE[1]))
+        self.cboxBoardSize.set_active(0)
+        global SERVER
+        if SERVER is not None:
+            btStartServer = gtk.Button(label="Stop Server")
+        else:
+            btStartServer = gtk.Button(label="Start Server")
+        btStartServer.connect("clicked", self.startServer, None)
+        hbox = gtk.HBox(True, 3)
+        hbox.pack_start(lblBoardSize, False, False, 10)
+        hbox.pack_end(self.cboxBoardSize, False, False, 10)
+        hbox2 = gtk.HBox(True, 3)
+        hbox2.pack_start(btStartServer, False, False, 10)
+        vbox = gtk.VBox(False, 3)
+        vbox.pack_start(hbox, False, False, 5)
+        vbox.pack_end(hbox2, False, False, 5)
+        self.add(vbox)
+        self.show_all()
+
+    def startMainMenu(self, widget, data=None):
+        self.destroy()
+        MainWindow().show()
+
+    def startServer(self, widget, data = None):
+        # Get options
+        index = self.cboxBoardSize.get_active()
+        self.destroy()
+        # starting the server waiting for cnnections
+        global SERVER
+        if SERVER is None:
+            SERVER = ThreadingTCPServer(SERVER_ADDRESS, MyTCPHandler)
+            global VBO
+            VBO = VikingChessBoardOnline()
+            VBO.startGame()
+            VBO.isServer = True
+            print "start server"
+            threading.Thread(target=SERVER.serve_forever).start()
+        else:
+            print "stop server"
+            SERVER.shutdown()
+            SERVER = None
+    #def startServer(self, widget, data = None)
+#class ServerSetup(gtk.Window)
+
 ##############################################################################
 class VikingChessBoard(object):
-    def __init__(self, gameIndex):
+    def __init__(self, gameIndex = 0):
         self.gameIndex = gameIndex
         self.whiteCount = 0
         self.mainWindow = mainWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -286,7 +401,6 @@ class VikingChessBoard(object):
         else:
             return True
     #def onClose(self, widget, data=None)
-
 
     def startGame(self):
         self.mainWindow.show_all()
@@ -425,7 +539,7 @@ class VikingChessBoard(object):
                 self.selectedCell = cell
             else: # move the knight if possible
                 if self.selectedCell is not None and self.isValidMove(cell):
-                    self.performMove(self.selectedCell, cell)
+                    self.performMove(self.selectedCell.x, self.selectedCell.y, cell.x, cell.y)
                 else:
                     cell.set_active(False)
         else:
@@ -478,7 +592,9 @@ class VikingChessBoard(object):
         # Otherwise the move is valid
         return True
 
-    def performMove(self, fromCell, toCell):
+    def performMove(self, fromCellX, fromCellY, toCellX, toCellY):
+        fromCell = self.cell[fromCellX][fromCellY]
+        toCell = self.cell[toCellX][toCellY]
         self.logMove(self.whiteTurn, fromCell, toCell)
         if fromCell.isWhite:
             toCell.setWhite()
@@ -502,7 +618,7 @@ class VikingChessBoard(object):
             self.mainWindow.set_title("Viking Chess - " + whoseTurn)
         else:
             self.showGameOverDialog()
-    #def performMove(self, fromCell, toCell)
+    #def performMove(self, fromCellX, fromCellY, toCellX, toCellY)
 
     def checkKilledKnights(self, curCell):
         # We need to check only the cross 5x5 with the center in the current cell:
@@ -700,12 +816,59 @@ class VikingChessBoard(object):
 
 ##############################################################################
 class VikingChessBoardOnline(VikingChessBoard):
+    def __init__(self):
+        VikingChessBoard.__init__(self)
+        self.isServer = False
+
     # Override buttonClicked() according to client/server behaviour
     # to send data about the move to the other player.
     #
     # Call performMove() on receiving the data from client/server
     # to move the knight like the other player did.
-    pass
+    def buttonClicked(self, cell, data=None):
+        if self.isServer and self.whiteTurn or\
+           not self.isServer and not self.whiteTurn:
+            if cell.get_active():
+                # Allow to select only the knights of player color
+                if (self.whiteTurn and cell.isWhite) or\
+                   (not self.whiteTurn and (cell.isBlack or cell.isBlackKing)): # choose the knight to move
+                    if self.selectedCell is not None and self.selectedCell != cell:
+                        self.selectedCell.set_active(False)
+                    self.selectedCell = cell
+                else: # move the knight if possible
+                    if self.selectedCell is not None and self.isValidMove(cell):
+                        global TO_SEND
+                        TO_SEND = str(self.selectedCell.x) + ":" + str(self.selectedCell.y) + ":" + str(cell.x) + ":" + str(cell.y)
+                        self.performMove(self.selectedCell.x, self.selectedCell.y, cell.x, cell.y)
+                        self.whiteTurn = not self.whiteTurn
+                    else:
+                        cell.set_active(False)
+            else:
+                if self.selectedCell == cell:
+                    # Unselect current cell
+                    self.selectedCell = None
+                #if (self.whiteTurn and cell.isWhite)...
+        else:
+            cell.set_active(False)
+    #def buttonClicked(self, cell, data=None)
+
+    def onClose(self, widget, data=None):
+        dialog = gtk.MessageDialog(self.mainWindow,
+            gtk.DIALOG_MODAL,
+            gtk.MESSAGE_INFO,
+            gtk.BUTTONS_YES_NO,
+            "Quit the game? It will discard all game progress.")
+        dialog.set_title("Confirm Quit")
+        response = dialog.run()
+        dialog.destroy()
+        if response == gtk.RESPONSE_YES:
+            global TO_SEND
+            TO_SEND = "Bye"
+            self.mainWindow.destroy()
+            MainWindow().show() # Show main menu on exit
+        else:
+            return True
+    #def onClose(self, widget, data=None)
 #class VikingChessBoardOnline(VikingChessBoard)
 
 
@@ -796,10 +959,59 @@ class Cell(gtk.ToggleButton):
 
 
 ##############################################################################
+class ThreadingTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+    def server_bind(self):
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind(self.server_address)
+
+class MyTCPHandler(SocketServer.StreamRequestHandler):
+    """
+    The RequestHandler class for our server.
+
+    It is instantiated once per connection to the server, and must
+    override the handle() method to implement communication to the
+    client.
+    """
+    def handle(self):
+        # self.request is the TCP socket connected to the client
+        self.data = self.rfile.readline().strip()
+        print "{} wrote:".format(self.client_address[0])
+        print self.data
+        global VBO
+        global TO_SEND
+        TO_SEND = None
+        if self.data == "Hello":
+            print "Start Server Board"
+            while True:
+                while TO_SEND is None:
+                    time.sleep(1)
+                self.wfile.write(TO_SEND)
+                print "Server: send: " + TO_SEND
+                if TO_SEND != "Bye":
+                    TO_SEND = None
+                    VBO.whiteTurn = not VBO.whiteTurn
+                    self.data = self.rfile.readline().strip()
+                    print "Server: recv: " + self.data
+                    if self.data != "Bye":
+                        from_cell_x, from_cell_y, to_cell_x, to_cell_y = self.data.split(':')
+                        VBO.performMove(int(from_cell_x), int(from_cell_y), int(to_cell_x), int(to_cell_y))
+                    else:
+                        break
+                else:
+                    break
+#class MyTCPHandler(SocketServer.BaseRequestHandler)
+
+##############################################################################
 def main():
+    gtk.gdk.threads_enter()
     gtk.main()
+    gtk.gdk.threads_leave()
     return 0
 
+def main_quit(widget=None, data=None):
+    if SERVER is not None:
+        SERVER.shutdown()
+    gtk.main_quit()
 
 if __name__ == "__main__":
     MainWindow().show()
