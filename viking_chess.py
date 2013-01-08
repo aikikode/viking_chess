@@ -210,7 +210,7 @@ class ServerSetup(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self)
         self.connect("delete-event", self.startMainMenu)
-        self.set_resizable(True)
+        self.set_resizable(False)
         self.set_title("Viking Chess Server Setup")
         self.set_border_width(0)
         self.set_position(gtk.WIN_POS_CENTER)
@@ -221,8 +221,8 @@ class ServerSetup(gtk.Window):
         self.cboxBoardSize.append_text(str(BOARD_SIZE[1]) + " x " + str(BOARD_SIZE[1]))
         self.cboxBoardSize.set_active(0)
         hbox = gtk.HBox(True, 3)
-        hbox.pack_start(lblBoardSize, False, False, 10)
-        hbox.pack_end(self.cboxBoardSize, False, False, 10)
+        hbox.pack_start(lblBoardSize, False, False, 3)
+        hbox.pack_end(self.cboxBoardSize, False, False, 3)
 
 #       Disable side choice for now
 #       TODO: add its handle
@@ -232,26 +232,26 @@ class ServerSetup(gtk.Window):
 #        self.cboxSideChoice.append_text("Black (defending)")
 #        self.cboxSideChoice.set_active(0)
 #        hbox2 = gtk.HBox(True, 3)
-#        hbox2.pack_start(lblSideChoice, False, False, 10)
-#        hbox2.pack_end(self.cboxSideChoice, False, False, 10)
+#        hbox2.pack_start(lblSideChoice, False, False, 5)
+#        hbox2.pack_end(self.cboxSideChoice, False, False, 5)
 
         lblServerPort = gtk.Label("Server Port:")
         self.entryServerPort = NumberEntry()
         self.entryServerPort.set_text(str(SERVER_PORT))
         hbox3 = gtk.HBox(True, 3)
-        hbox3.pack_start(lblServerPort, False, False, 10)
-        hbox3.pack_end(self.entryServerPort, False, False, 10)
+        hbox3.pack_start(lblServerPort, False, False, 3)
+        hbox3.pack_end(self.entryServerPort, False, False, 3)
 
-        btStartServer = gtk.Button(label="Start Server")
+        self.btStartServer = btStartServer = gtk.Button(label="Start Server")
         btStartServer.connect("clicked", self.startServer, None)
         hbox4 = gtk.HBox(True, 3)
-        hbox4.pack_start(btStartServer, False, False, 10)
+        hbox4.pack_start(btStartServer, False, False, 3)
 
         vbox = gtk.VBox(False, 3)
-        vbox.pack_start(hbox, False, False, 5)
-#        vbox.pack_start(hbox2, False, False, 5)
-        vbox.pack_start(hbox3, False, False, 5)
-        vbox.pack_start(hbox4, False, False, 5)
+        vbox.pack_start(hbox, False, False, 3)
+#        vbox.pack_start(hbox2, False, False, 3)
+        vbox.pack_start(hbox3, False, False, 3)
+        vbox.pack_start(hbox4, False, False, 3)
         self.add(vbox)
         self.show_all()
 
@@ -299,7 +299,7 @@ class ClientSetup(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self)
         self.connect("delete-event", self.startMainMenu)
-        self.set_resizable(True)
+        self.set_resizable(False)
         self.set_title("Viking Chess Client Setup")
         self.set_border_width(0)
         self.set_position(gtk.WIN_POS_CENTER)
@@ -898,8 +898,8 @@ class VikingChessBoard(object):
             parent = None,
             flags = gtk.DIALOG_DESTROY_WITH_PARENT,
             type = gtk.MESSAGE_INFO,
-            buttons = gtk.BUTTONS_OK,
-            message_format = winner + " won!"
+            buttons = gtk.BUTTONS_YES_NO,
+            message_format = winner + " won!\n\nStart new game?"
         )
         winnerDialog.set_title("Round complete!")
         winnerDialog.connect('response', self.gameOverDialogResponse)
@@ -908,9 +908,13 @@ class VikingChessBoard(object):
         winnerDialog.set_keep_above(True)
         winnerDialog.show()
     @idle_add_decorator
-    def gameOverDialogResponse(self, widget, data=None):
+    def gameOverDialogResponse(self, widget, response=None):
         widget.destroy()
-        self.startGame()
+        if response == gtk.RESPONSE_YES:
+            self.startGame()
+        else:
+            self.mainWindow.destroy()
+            MainWindow().show()
 #class VikingChessBoard(object)
 
 
