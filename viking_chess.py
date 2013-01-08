@@ -36,11 +36,11 @@ import gtk
 
 gtk.gdk.threads_init()
 
-VERSION = "0.0.1"
+VERSION = "0.1.0"
 
 BOARD_SIZE = (9, 13)  # all boards are square -> no need to store 2 dimensions
 
-SERVER_HOST = '127.0.0.1'
+SERVER_HOST = '0.0.0.0'
 SERVER_PORT = 8000
 SERVER_ADDRESS = (SERVER_HOST, SERVER_PORT)
 
@@ -120,14 +120,8 @@ class MainWindow(gtk.Window):
         ServerSetup()
 
     def showClientSetup(self, widget, data = None):
-        # TODO: make a real setup window
         self.destroy()
-        print "Start Client Board"
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect(SERVER_ADDRESS)
-        vc = VikingChessBoardOnline(False, client_socket)
-        vc.isServer = False
-        vc.startGame()
+        ClientSetup()
 
     def showHelp(self, widget, data=None):
         window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -226,16 +220,38 @@ class ServerSetup(gtk.Window):
         self.cboxBoardSize.append_text(str(BOARD_SIZE[0]) + " x " + str(BOARD_SIZE[0]))
         self.cboxBoardSize.append_text(str(BOARD_SIZE[1]) + " x " + str(BOARD_SIZE[1]))
         self.cboxBoardSize.set_active(0)
-        btStartServer = gtk.Button(label="Start Server")
-        btStartServer.connect("clicked", self.startServer, None)
         hbox = gtk.HBox(True, 3)
         hbox.pack_start(lblBoardSize, False, False, 10)
         hbox.pack_end(self.cboxBoardSize, False, False, 10)
-        hbox2 = gtk.HBox(True, 3)
-        hbox2.pack_start(btStartServer, False, False, 10)
+
+#       Disable side choice for now
+#       TODO: add its handle
+#        lblSideChoice = gtk.Label("Choose the side:")
+#        self.cboxSideChoice = gtk.combo_box_new_text()
+#        self.cboxSideChoice.append_text("White (attacking)")
+#        self.cboxSideChoice.append_text("Black (defending)")
+#        self.cboxSideChoice.set_active(0)
+#        hbox2 = gtk.HBox(True, 3)
+#        hbox2.pack_start(lblSideChoice, False, False, 10)
+#        hbox2.pack_end(self.cboxSideChoice, False, False, 10)
+
+        lblServerPort = gtk.Label("Server Port:")
+        self.entryServerPort = NumberEntry()
+        self.entryServerPort.set_text(str(SERVER_PORT))
+        hbox3 = gtk.HBox(True, 3)
+        hbox3.pack_start(lblServerPort, False, False, 10)
+        hbox3.pack_end(self.entryServerPort, False, False, 10)
+
+        btStartServer = gtk.Button(label="Start Server")
+        btStartServer.connect("clicked", self.startServer, None)
+        hbox4 = gtk.HBox(True, 3)
+        hbox4.pack_start(btStartServer, False, False, 10)
+
         vbox = gtk.VBox(False, 3)
         vbox.pack_start(hbox, False, False, 5)
-        vbox.pack_end(hbox2, False, False, 5)
+#        vbox.pack_start(hbox2, False, False, 5)
+        vbox.pack_start(hbox3, False, False, 5)
+        vbox.pack_start(hbox4, False, False, 5)
         self.add(vbox)
         self.show_all()
 
@@ -245,22 +261,135 @@ class ServerSetup(gtk.Window):
 
     def startServer(self, widget, data = None):
         # Get options
-        index = self.cboxBoardSize.get_active()
+        gameIndex = self.cboxBoardSize.get_active()
+#        side = self.cboxSideChoice.get_active()
+        serverPort = int("0" + self.entryServerPort.get_text())
+        if serverPort == 0:
+            serverPort = SERVER_PORT
+
         self.destroy()
         # starting the server waiting for cnnections
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind(SERVER_ADDRESS)
-        server_socket.listen(2)
-        print "Start Server"
-        print "Waiting for a client to connect"
-        connection_socket, connection_addr = server_socket.accept()
-        # Send game index to the client
-        connection_socket.send(str(index))
-        vc = VikingChessBoardOnline(True, connection_socket, index)
-        vc.isServer = True
-        vc.startGame()
+        try:
+            server_socket.bind((SERVER_HOST, serverPort))
+            server_socket.listen(1)
+            print "Start Server"
+            print "Waiting for a client to connect"
+            connection_socket, connection_addr = server_socket.accept()
+            # Send game index to the client
+            connection_socket.send(str(gameIndex))
+            vc = VikingChessBoardOnline(True, connection_socket, gameIndex)
+            vc.isServer = True
+            vc.startGame()
+        except socket.error:
+            showErrorDialog("Server Error", "Port " + str(serverPort) + " seems to be in use.\n\nTry other port")
+            server_socket.close()
+            ServerSetup()
+        except:
+            showErrorDialog("Error occurred", "Try to restart the server")
+            server_socket.shutdown(socket.SHUT_WR)
+            server_socket.close()
+            ServerSetup()
     #def startServer(self, widget, data = None)
 #class ServerSetup(gtk.Window)
+
+
+##############################################################################
+class ClientSetup(gtk.Window):
+    def __init__(self):
+        gtk.Window.__init__(self)
+        self.connect("delete-event", self.startMainMenu)
+        self.set_resizable(True)
+        self.set_title("Viking Chess Client Setup")
+        self.set_border_width(0)
+        self.set_position(gtk.WIN_POS_CENTER)
+
+        lblServerHost = gtk.Label("Server IP:")
+        self.entryServerHost = IPEntry()
+        self.entryServerHost.set_text("127.0.0.1")
+        hbox = gtk.HBox(True, 3)
+        hbox.pack_start(lblServerHost, False, False, 10)
+        hbox.pack_end(self.entryServerHost, False, False, 10)
+
+        lblServerPort = gtk.Label("Server Port:")
+        self.entryServerPort = NumberEntry()
+        self.entryServerPort.set_text(str(SERVER_PORT))
+        hbox2 = gtk.HBox(True, 3)
+        hbox2.pack_start(lblServerPort, False, False, 10)
+        hbox2.pack_end(self.entryServerPort, False, False, 10)
+
+        btStartServer = gtk.Button(label="Connect...")
+        btStartServer.connect("clicked", self.startClient, None)
+        hbox3 = gtk.HBox(True, 3)
+        hbox3.pack_start(btStartServer, False, False, 10)
+
+        vbox = gtk.VBox(False, 3)
+        vbox.pack_start(hbox, False, False, 5)
+        vbox.pack_start(hbox2, False, False, 5)
+        vbox.pack_start(hbox3, False, False, 5)
+        self.add(vbox)
+        self.show_all()
+
+    def startMainMenu(self, widget, data=None):
+        self.destroy()
+        MainWindow().show()
+
+    def startClient(self, widget, data = None):
+        # Get options
+        serverHost = self.entryServerHost.get_text()
+        serverPort = int("0" + self.entryServerPort.get_text())
+        if serverPort == 0:
+            serverPort = SERVER_PORT
+
+        self.destroy()
+
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            client_socket.connect((serverHost, serverPort))
+            vc = VikingChessBoardOnline(False, client_socket)
+            vc.isServer = False
+            vc.startGame()
+        except socket.error:
+            showErrorDialog("Connection Error", "No server found. Try other address/port")
+            client_socket.close()
+            ClientSetup()
+        except OverflowError:
+            showErrorDialog("Wrong Port" ,"Port must be 0-65535")
+            client_socket.close()
+            ClientSetup()
+        except:
+            client_socket.shutdown(socket.SHUT_WR)
+            client_socket.close()
+            ClientSetup()
+    #def startClient(self, widget, data = None)
+#class ClientSetup(gtk.Window)
+
+##############################################################################
+# Helper functions
+class NumberEntry(gtk.Entry):
+    """ Allow only numbers in Entry box """
+    def __init__(self):
+        gtk.Entry.__init__(self)
+        self.connect('changed', self.on_changed)
+    def on_changed(self, *args):
+        text = self.get_text().strip()
+        self.set_text(''.join([i for i in text if i in '0123456789']))
+
+class IPEntry(NumberEntry):
+    """ Allow only numbers and dots in Entry box """
+    def on_changed(self, *args):
+        text = self.get_text().strip()
+        self.set_text(''.join([i for i in text if i in '0123456789.']))
+
+def showErrorDialog(title, message):
+    dialog = gtk.MessageDialog(None,
+            gtk.DIALOG_MODAL,
+            gtk.MESSAGE_ERROR,
+            gtk.BUTTONS_CLOSE,
+            message)
+    dialog.set_title(title)
+    dialog.run()
+    dialog.destroy()
 
 ##############################################################################
 class VikingChessBoard(object):
@@ -334,7 +463,8 @@ class VikingChessBoard(object):
 
     def scrollLog(self, widget, data=None):
         adj = self.sw.get_vadjustment()
-        adj.set_value(adj.upper - adj.page_size)
+        if adj is not None:
+            adj.set_value(adj.upper - adj.page_size)
     def logMessage(self, message):
         iter = self.textbuffer.get_end_iter()
         iter.backward_char()
@@ -791,6 +921,7 @@ class VikingChessBoardOnline(VikingChessBoard):
         self.isServer = isServer
         self.msocket = msocket
         self.gameIndex = gameIndex
+        self.isOn = False   # is the board is ready to receive data
         if not self.isServer:
             # Get game index from the server
             self.gameIndex = int(self.msocket.recv(1024).strip())
@@ -798,6 +929,7 @@ class VikingChessBoardOnline(VikingChessBoard):
 
     def startGame(self):
         print "New Game Started"
+        self.isOn = True
         VikingChessBoard.startGame(self)
         if not self.isServer:
             threading.Thread(target=self.wait_for_move).start()
@@ -836,9 +968,13 @@ class VikingChessBoardOnline(VikingChessBoard):
 
     def wait_for_move(self):
         data = self.msocket.recv(1024).strip()
-        from_cell_x, from_cell_y, to_cell_x, to_cell_y = data.split(':')
-        # Use idle_add to update GUI not from the main thread
-        gobject.idle_add(self.performMove, int(from_cell_x), int(from_cell_y), int(to_cell_x), int(to_cell_y))
+        if self.isOn:
+            if data == "Bye":
+                threading.Thread(target=self.showDisconnectedDialog).start()
+            else:
+                from_cell_x, from_cell_y, to_cell_x, to_cell_y = data.split(':')
+                # Use idle_add to update GUI not from the main thread
+                gobject.idle_add(self.performMove, int(from_cell_x), int(from_cell_y), int(to_cell_x), int(to_cell_y))
 
     def onClose(self, widget, data=None):
         dialog = gtk.MessageDialog(self.mainWindow,
@@ -850,6 +986,8 @@ class VikingChessBoardOnline(VikingChessBoard):
         response = dialog.run()
         dialog.destroy()
         if response == gtk.RESPONSE_YES:
+            self.isOn = False
+            self.msocket.send("Bye")
             self.msocket.shutdown(socket.SHUT_WR)
             self.msocket.close()
             self.mainWindow.destroy()
@@ -857,6 +995,28 @@ class VikingChessBoardOnline(VikingChessBoard):
         else:
             return True
     #def onClose(self, widget, data=None)
+
+    @idle_add_decorator
+    def showDisconnectedDialog(self):
+        winnerDialog = gtk.MessageDialog(
+            parent = None,
+            flags = gtk.DIALOG_DESTROY_WITH_PARENT,
+            type = gtk.MESSAGE_INFO,
+            buttons = gtk.BUTTONS_OK,
+            message_format = "Sorry, try to reconnect and start over"
+        )
+        winnerDialog.set_title("Partner disconnected!")
+        winnerDialog.connect('response', self.disconnectedDialogResponse)
+        winnerDialog.connect('close', self.disconnectedDialogResponse)
+        winnerDialog.set_position(gtk.WIN_POS_CENTER)
+        winnerDialog.set_keep_above(True)
+        winnerDialog.show()
+    @idle_add_decorator
+    def disconnectedDialogResponse(self, widget, data=None):
+        widget.destroy()
+        self.mainWindow.destroy()
+        self.isOn = False
+        MainWindow().show() # Show main menu
 #class VikingChessBoardOnline(VikingChessBoard)
 
 
