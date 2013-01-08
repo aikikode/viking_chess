@@ -45,6 +45,7 @@ SERVER_PORT = 8000
 SERVER_ADDRESS = (SERVER_HOST, SERVER_PORT)
 
 # Colors definitions (in 256-base RGB)
+WINDOW_BG_COLOR       = (234, 234, 234)
 BUTTON_EMPTY_BG_COLOR = (215, 152,  36)   # initially empty cell
 WHITE_FORTRESS_COLOR  = (  0, 100,   0)   # initial white knights location
 BLACK_FORTRESS_COLOR  = (  0,   0, 250)   # initial black knights and king location
@@ -55,6 +56,7 @@ GTK_COLOR_BASE = 65535
 RGB_COLOR_BASE = 255
 def rgb_to_gtk_simple(rgb_color): return GTK_COLOR_BASE * rgb_color / RGB_COLOR_BASE
 def RGB_TO_GTK(rgb_color_tuple): return map(rgb_to_gtk_simple, rgb_color_tuple)
+def GDK_COLOR(rgb_color_tuple): return gtk.gdk.Color(*(RGB_TO_GTK(rgb_color_tuple)))
 
 # Enable images on buttons (since they are disabled by default)
 if sys.platform=="win32":
@@ -75,12 +77,12 @@ class MainWindow(gtk.Window):
         start a server or connect to existing one """
     def __init__(self):
         gtk.Window.__init__(self)
-        self.connect("delete-event", main_quit) # Prevent application hanging after closing the window
+        self.connect("delete-event", gtk.main_quit) # Prevent application hanging after closing the window
         self.set_keep_above(False)
         self.set_title("Viking Chess")
         self.set_position(gtk.WIN_POS_CENTER)
         self.set_resizable(False)
-
+        self.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
         # Put buttons in VBox and put that VBox in HBox to get some space between buttons
         btStartLocalGame = gtk.Button(label="Start Local Game")
         btStartLocalGame.set_size_request(200, 50)
@@ -128,6 +130,7 @@ class MainWindow(gtk.Window):
         window.set_resizable(True)
         window.set_title("Viking Chess Rules")
         window.set_border_width(0)
+        window.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
 
         box1 = gtk.VBox(False, 0)
         window.add(box1)
@@ -174,6 +177,7 @@ class LocalGameSetup(gtk.Window):
         self.set_title("Setup")
         self.set_position(gtk.WIN_POS_CENTER)
         self.set_resizable(False)
+        self.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
 
         lblBoardSize = gtk.Label("Set board size:")
         self.cboxBoardSize = gtk.combo_box_new_text()
@@ -214,6 +218,7 @@ class ServerSetup(gtk.Window):
         self.set_title("Viking Chess Server Setup")
         self.set_border_width(0)
         self.set_position(gtk.WIN_POS_CENTER)
+        self.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
 
         lblBoardSize = gtk.Label("Set board size:")
         self.cboxBoardSize = gtk.combo_box_new_text()
@@ -303,6 +308,7 @@ class ClientSetup(gtk.Window):
         self.set_title("Viking Chess Client Setup")
         self.set_border_width(0)
         self.set_position(gtk.WIN_POS_CENTER)
+        self.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
 
         lblServerHost = gtk.Label("Server IP:")
         self.entryServerHost = IPEntry()
@@ -402,6 +408,12 @@ class VikingChessBoard(object):
         mainWindow.set_keep_above(False)
         self.mainWindow.set_title("Viking Chess - White")
         mainWindow.set_resizable(False)
+        self.mainWindow.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
+
+        if 0 == gameIndex:
+            labelSize = 0
+        else:
+            labelSize = 16
 
         vboxBoard = gtk.VBox()
         hbox = [gtk.HBox() for x in xrange(BOARD_SIZE[self.gameIndex])]
@@ -413,12 +425,12 @@ class VikingChessBoard(object):
         [[hbox[y].pack_start(self.cell[x][BOARD_SIZE[self.gameIndex] - 1 - y]) for x in xrange(BOARD_SIZE[self.gameIndex])] for y in xrange(BOARD_SIZE[self.gameIndex])]
 
         # X axises from below and from above the board
-        hboxXAxisBelow = gtk.HBox()
+        hboxXAxisBelow = gtk.HBox(False, 1)
         xAxis = [gtk.Label(chr(ord('a') + x)) for x in xrange(BOARD_SIZE[self.gameIndex])]
-        [hboxXAxisBelow.pack_start(xAxis[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
-        hboxXAxisAbove = gtk.HBox()
+        [hboxXAxisBelow.pack_start(xAxis[x], True, True, labelSize) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        hboxXAxisAbove = gtk.HBox(False, 1)
         xAxis = [gtk.Label(chr(ord('a') + x)) for x in xrange(BOARD_SIZE[self.gameIndex])]
-        [hboxXAxisAbove.pack_start(xAxis[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [hboxXAxisAbove.pack_start(xAxis[x], True, True, labelSize) for x in xrange(BOARD_SIZE[self.gameIndex])]
         # Y axises from the left and from the right of the board
         vboxYAxisLeft = gtk.VBox()
         yAxis = [gtk.Label(y + 1) for y in xrange(BOARD_SIZE[self.gameIndex])]
@@ -1114,10 +1126,6 @@ def main():
     gtk.main()
     gtk.gdk.threads_leave()
     return 0
-
-def main_quit(widget=None, data=None):
-    # TODO: stop server here and close all connections
-    gtk.main_quit()
 
 if __name__ == "__main__":
     MainWindow().show()
