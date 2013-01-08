@@ -125,7 +125,7 @@ class MainWindow(gtk.Window):
         print "Start Client Board"
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect(SERVER_ADDRESS)
-        vc = VikingChessBoardOnline(client_socket)
+        vc = VikingChessBoardOnline(False, client_socket)
         vc.isServer = False
         vc.startGame()
 
@@ -254,7 +254,9 @@ class ServerSetup(gtk.Window):
         print "Start Server"
         print "Waiting for a client to connect"
         connection_socket, connection_addr = server_socket.accept()
-        vc = VikingChessBoardOnline(connection_socket)
+        # Send game index to the client
+        connection_socket.send(str(index))
+        vc = VikingChessBoardOnline(True, connection_socket, index)
         vc.isServer = True
         vc.startGame()
     #def startServer(self, widget, data = None)
@@ -784,10 +786,15 @@ class VikingChessBoard(object):
 
 ##############################################################################
 class VikingChessBoardOnline(VikingChessBoard):
-    def __init__(self, msocket):
-        VikingChessBoard.__init__(self)
-        self.isServer = False
+    def __init__(self, isServer, msocket, gameIndex=0):
+        print "OnlineChess Server: " + str(isServer) + " Index = " + str(gameIndex)
+        self.isServer = isServer
         self.msocket = msocket
+        self.gameIndex = gameIndex
+        if not self.isServer:
+            # Get game index from the server
+            self.gameIndex = int(self.msocket.recv(1024).strip())
+        VikingChessBoard.__init__(self, self.gameIndex)
 
     def startGame(self):
         print "New Game Started"
