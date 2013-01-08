@@ -23,17 +23,16 @@
 # License version 3 and version 2.1 along with this program.  If not, see
 # <http://www.gnu.org/licenses>
 #
+
 import gobject
 import socket
-
 import sys
 import pygtk
-import time
+import threading
 
 pygtk.require('2.0')
 import pango
 import gtk
-import SocketServer
 
 gtk.gdk.threads_init()
 
@@ -63,6 +62,11 @@ if sys.platform=="win32":
 else:
     settings = gtk.settings_get_default()
     settings.props.gtk_button_images = True
+
+def idle_add_decorator(func):
+    def callback(*args):
+        gobject.idle_add(func, *args)
+    return callback
 
 ##############################################################################
 class MainWindow(gtk.Window):
@@ -247,6 +251,7 @@ class ServerSetup(gtk.Window):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.bind(SERVER_ADDRESS)
         server_socket.listen(2)
+        print "Start Server"
         print "Waiting for a client to connect"
         connection_socket, connection_addr = server_socket.accept()
         vc = VikingChessBoardOnline(connection_socket)
@@ -576,11 +581,7 @@ class VikingChessBoard(object):
             whoseTurn = "White" if self.whiteTurn else "Black"
             self.mainWindow.set_title("Viking Chess - " + whoseTurn)
         else:
-            # TODO: show game over dialog
-            # it is disabled due to server blocking GUI issue
-            # so we just start the game again
-            # self.showGameOverDialog()
-            gobject.idle_add(self.startGame)
+            threading.Thread(target=self.showGameOverDialog).start()
     #def performMove(self, fromCellX, fromCellY, toCellX, toCellY)
 
     def checkKilledKnights(self, curCell):
@@ -688,7 +689,7 @@ class VikingChessBoard(object):
             gtk.BUTTONS_CLOSE,
             "Black king is in check!\nYou have one move to rescue him!")
         dialog.set_title("King in check!")
-        response = dialog.run()
+        dialog.run()
         dialog.destroy()
 
     def checkClearCheck(self):
@@ -757,23 +758,27 @@ class VikingChessBoard(object):
         #if cell[kingX][kingY].isThrone
     #def checkClearCheck(self)
 
+    @idle_add_decorator
     def showGameOverDialog(self):
-        self.mainWindow.set_title("Viking Chess - " + self.winner + " won!")
         winner = self.winner
+        self.mainWindow.set_title("Viking Chess - " + winner + " won!")
         winnerDialog = gtk.MessageDialog(
             parent = None,
             flags = gtk.DIALOG_DESTROY_WITH_PARENT,
             type = gtk.MESSAGE_INFO,
             buttons = gtk.BUTTONS_OK,
-            message_format = self.winner + " won!"
+            message_format = winner + " won!"
         )
         winnerDialog.set_title("Round complete!")
-        winnerDialog.connect('response', lambda dialog, response: self.startGame())
+        winnerDialog.connect('response', self.gameOverDialogResponse)
+        winnerDialog.connect('close', self.gameOverDialogResponse)
         winnerDialog.set_position(gtk.WIN_POS_CENTER)
         winnerDialog.set_keep_above(True)
-        winnerDialog.run()
-        winnerDialog.destroy()
-    #def showGameOverDialog(self)
+        winnerDialog.show()
+    @idle_add_decorator
+    def gameOverDialogResponse(self, widget, data=None):
+        widget.destroy()
+        self.startGame()
 #class VikingChessBoard(object)
 
 
@@ -785,10 +790,10 @@ class VikingChessBoardOnline(VikingChessBoard):
         self.msocket = msocket
 
     def startGame(self):
-        print "StartGame"
+        print "New Game Started"
         VikingChessBoard.startGame(self)
         if not self.isServer:
-            gobject.idle_add(self.wait_for_move) # call this method later to update GUI first
+            threading.Thread(target=self.wait_for_move).start()
 
     # Override buttonClicked() according to client/server behaviour
     # to send data about the move to the other player.
@@ -811,7 +816,7 @@ class VikingChessBoardOnline(VikingChessBoard):
                         self.msocket.send(to_send)
                         self.performMove(self.selectedCell.x, self.selectedCell.y, cell.x, cell.y)
                         if self.winner is None:
-                            gobject.idle_add(self.wait_for_move) # call this method later to update GUI first
+                            threading.Thread(target=self.wait_for_move).start()
                     else:
                         cell.set_active(False)
             else:
@@ -825,7 +830,26 @@ class VikingChessBoardOnline(VikingChessBoard):
     def wait_for_move(self):
         data = self.msocket.recv(1024).strip()
         from_cell_x, from_cell_y, to_cell_x, to_cell_y = data.split(':')
-        self.performMove(int(from_cell_x), int(from_cell_y), int(to_cell_x), int(to_cell_y))
+        # Use idle_add to update GUI not from the main thread
+        gobject.idle_add(self.performMove, int(from_cell_x), int(from_cell_y), int(to_cell_x), int(to_cell_y))
+
+    def onClose(self, widget, data=None):
+        dialog = gtk.MessageDialog(self.mainWindow,
+            gtk.DIALOG_MODAL,
+            gtk.MESSAGE_INFO,
+            gtk.BUTTONS_YES_NO,
+            "Quit the game? It will discard all game progress.")
+        dialog.set_title("Confirm Quit")
+        response = dialog.run()
+        dialog.destroy()
+        if response == gtk.RESPONSE_YES:
+            self.msocket.shutdown(socket.SHUT_WR)
+            self.msocket.close()
+            self.mainWindow.destroy()
+            MainWindow().show() # Show main menu on exit
+        else:
+            return True
+    #def onClose(self, widget, data=None)
 #class VikingChessBoardOnline(VikingChessBoard)
 
 
@@ -865,7 +889,6 @@ class Cell(gtk.ToggleButton):
         image.set_from_pixbuf(scaled_buf)
         self.set_image(image)
 
-
     def setBlack(self):
         self.set_label("")
         self.isWhite = False
@@ -876,7 +899,6 @@ class Cell(gtk.ToggleButton):
         image = gtk.Image()
         image.set_from_pixbuf(scaled_buf)
         self.set_image(image)
-
 
     def setBlackKing(self):
         self.set_label("")
