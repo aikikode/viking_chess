@@ -24,18 +24,28 @@
 # <http://www.gnu.org/licenses>
 #
 
+import gobject
+import socket
 import sys
 import pygtk
-import pango
+import threading
 
 pygtk.require('2.0')
+import pango
 import gtk
 
-VERSION = "0.0.1"
+gtk.gdk.threads_init()
+
+VERSION = "0.1.0"
 
 BOARD_SIZE = (9, 13)  # all boards are square -> no need to store 2 dimensions
 
+SERVER_HOST = '0.0.0.0'
+SERVER_PORT = 8000
+SERVER_ADDRESS = (SERVER_HOST, SERVER_PORT)
+
 # Colors definitions (in 256-base RGB)
+WINDOW_BG_COLOR       = (234, 234, 234)
 BUTTON_EMPTY_BG_COLOR = (215, 152,  36)   # initially empty cell
 WHITE_FORTRESS_COLOR  = (  0, 100,   0)   # initial white knights location
 BLACK_FORTRESS_COLOR  = (  0,   0, 250)   # initial black knights and king location
@@ -46,6 +56,7 @@ GTK_COLOR_BASE = 65535
 RGB_COLOR_BASE = 255
 def rgb_to_gtk_simple(rgb_color): return GTK_COLOR_BASE * rgb_color / RGB_COLOR_BASE
 def RGB_TO_GTK(rgb_color_tuple): return map(rgb_to_gtk_simple, rgb_color_tuple)
+def GDK_COLOR(rgb_color_tuple): return gtk.gdk.Color(*(RGB_TO_GTK(rgb_color_tuple)))
 
 # Enable images on buttons (since they are disabled by default)
 if sys.platform=="win32":
@@ -53,6 +64,11 @@ if sys.platform=="win32":
 else:
     settings = gtk.settings_get_default()
     settings.props.gtk_button_images = True
+
+def idle_add_decorator(func):
+    def callback(*args):
+        gobject.idle_add(func, *args)
+    return callback
 
 ##############################################################################
 class MainWindow(gtk.Window):
@@ -66,38 +82,55 @@ class MainWindow(gtk.Window):
         self.set_title("Viking Chess")
         self.set_position(gtk.WIN_POS_CENTER)
         self.set_resizable(False)
-
-        # Put button in HBox and put that HBox in VBox to get some space
+        self.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
+        # Put buttons in VBox and put that VBox in HBox to get some space between buttons
         btStartLocalGame = gtk.Button(label="Start Local Game")
         btStartLocalGame.set_size_request(200, 50)
         btStartLocalGame.connect("clicked", self.startLocalGameSetup, None)
-        hbox = gtk.HBox(True, 3)
-        hbox.pack_start(btStartLocalGame, False, False, 15)
-        # Make another button - for help/rules
+        vbox = gtk.VBox(True, 3)
+        vbox.pack_start(btStartLocalGame, False, False, 15)
+        # Add another button for server start
+        btServer = gtk.Button(label="Start Server")
+        btServer.set_size_request(200, 50)
+        btServer.connect("clicked", self.showServerSetup, None)
+        vbox.pack_start(btServer, False, False, 0)
+        # Add another button - for client connect
+        btClient = gtk.Button(label="Connect")
+        btClient.set_size_request(200, 50)
+        btClient.connect("clicked", self.showClientSetup, None)
+        vbox.pack_start(btClient, False, False, 0)
+        # Add another button - for help/rules
         btHelp = gtk.Button(label="Game Rules")
         btHelp.set_size_request(200, 50)
         btHelp.connect("clicked", self.showHelp, None)
-        hbox2 = gtk.HBox(True, 3)
-        hbox2.pack_start(btHelp, False, False, 15)
+        vbox.pack_start(btHelp, False, False, 0)
 
-        vbox = gtk.VBox(False, 5)
-        vbox.pack_start(hbox, False, False, 15)
-        vbox.pack_end(hbox2, False, False, 15)
-        self.add(vbox)
+        hbox = gtk.HBox(False, 5)
+        hbox.pack_start(vbox, False, False, 15)
+        self.add(hbox)
 
         # Show all controls
-        vbox.show_all()
+        hbox.show_all()
     #def __init__(self)
 
     def startLocalGameSetup(self, widget, data = None):
         self.destroy()
-        LocalGameSetup().show()
+        LocalGameSetup()
+
+    def showServerSetup(self, widget, data = None):
+        self.destroy()
+        ServerSetup()
+
+    def showClientSetup(self, widget, data = None):
+        self.destroy()
+        ClientSetup()
 
     def showHelp(self, widget, data=None):
         window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         window.set_resizable(True)
         window.set_title("Viking Chess Rules")
         window.set_border_width(0)
+        window.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
 
         box1 = gtk.VBox(False, 0)
         window.add(box1)
@@ -133,6 +166,7 @@ class MainWindow(gtk.Window):
     #def showHelp(self, widget, data=None)
 #class MainWindow(gtk.Window)
 
+##############################################################################
 class LocalGameSetup(gtk.Window):
     """ Settings window shown just before game start:
         choose game field size and other options """
@@ -143,6 +177,7 @@ class LocalGameSetup(gtk.Window):
         self.set_title("Setup")
         self.set_position(gtk.WIN_POS_CENTER)
         self.set_resizable(False)
+        self.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
 
         lblBoardSize = gtk.Label("Set board size:")
         self.cboxBoardSize = gtk.combo_box_new_text()
@@ -160,14 +195,8 @@ class LocalGameSetup(gtk.Window):
         vbox.pack_start(hbox, False, False, 5)
         vbox.pack_end(hbox2, False, False, 5)
         self.add(vbox)
-
         # Show all controls
-        lblBoardSize.show()
-        self.cboxBoardSize.show()
-        btStartGame.show()
-        hbox.show()
-        hbox2.show()
-        vbox.show()
+        self.show_all()
     #def __init__(self)
 
     def startMainMenu(self, widget, data=None):
@@ -179,16 +208,214 @@ class LocalGameSetup(gtk.Window):
         index = self.cboxBoardSize.get_active()
         self.destroy()
         VikingChessBoard(index).startGame()
+#class LocalGameSetup(gtk.Window)
 
+class ServerSetup(gtk.Window):
+    def __init__(self):
+        gtk.Window.__init__(self)
+        self.connect("delete-event", self.startMainMenu)
+        self.set_resizable(False)
+        self.set_title("Viking Chess Server Setup")
+        self.set_border_width(0)
+        self.set_position(gtk.WIN_POS_CENTER)
+        self.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
+
+        lblBoardSize = gtk.Label("Set board size:")
+        self.cboxBoardSize = gtk.combo_box_new_text()
+        self.cboxBoardSize.append_text(str(BOARD_SIZE[0]) + " x " + str(BOARD_SIZE[0]))
+        self.cboxBoardSize.append_text(str(BOARD_SIZE[1]) + " x " + str(BOARD_SIZE[1]))
+        self.cboxBoardSize.set_active(0)
+        hbox = gtk.HBox(True, 3)
+        hbox.pack_start(lblBoardSize, False, False, 3)
+        hbox.pack_end(self.cboxBoardSize, False, False, 3)
+
+#       Disable side choice for now
+#       TODO: add its handle
+#        lblSideChoice = gtk.Label("Choose the side:")
+#        self.cboxSideChoice = gtk.combo_box_new_text()
+#        self.cboxSideChoice.append_text("White (attacking)")
+#        self.cboxSideChoice.append_text("Black (defending)")
+#        self.cboxSideChoice.set_active(0)
+#        hbox2 = gtk.HBox(True, 3)
+#        hbox2.pack_start(lblSideChoice, False, False, 5)
+#        hbox2.pack_end(self.cboxSideChoice, False, False, 5)
+
+        lblServerPort = gtk.Label("Server Port:")
+        self.entryServerPort = NumberEntry()
+        self.entryServerPort.set_text(str(SERVER_PORT))
+        hbox3 = gtk.HBox(True, 3)
+        hbox3.pack_start(lblServerPort, False, False, 3)
+        hbox3.pack_end(self.entryServerPort, False, False, 3)
+
+        self.btStartServer = btStartServer = gtk.Button(label="Start Server")
+        btStartServer.connect("clicked", self.startServer, None)
+        hbox4 = gtk.HBox(True, 3)
+        hbox4.pack_start(btStartServer, False, False, 3)
+
+        vbox = gtk.VBox(False, 3)
+        vbox.pack_start(hbox, False, False, 3)
+#        vbox.pack_start(hbox2, False, False, 3)
+        vbox.pack_start(hbox3, False, False, 3)
+        vbox.pack_start(hbox4, False, False, 3)
+        self.add(vbox)
+        self.show_all()
+
+    def startMainMenu(self, widget, data=None):
+        self.destroy()
+        MainWindow().show()
+
+    def startServer(self, widget, data = None):
+        # Get options
+        gameIndex = self.cboxBoardSize.get_active()
+#        side = self.cboxSideChoice.get_active()
+        serverPort = int("0" + self.entryServerPort.get_text())
+        if serverPort == 0:
+            serverPort = SERVER_PORT
+
+        self.destroy()
+        # starting the server waiting for connection
+        print "Starting Server"
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            server_socket.bind((SERVER_HOST, serverPort))
+            server_socket.listen(1)
+            print "Waiting for a client to connect..."
+            connection_socket, connection_addr = server_socket.accept()
+            # Send game index to the client
+            connection_socket.send(str(gameIndex))
+            vc = VikingChessBoardOnline(True, connection_socket, gameIndex)
+            vc.isServer = True
+            vc.startGame()
+        except socket.error:
+            showErrorDialog("Server Error", "Port " + str(serverPort) + " seems to be in use.\n\nTry other port")
+            server_socket.close()
+            ServerSetup()
+        except:
+            showErrorDialog("Error occurred", "Try to restart the server")
+            server_socket.shutdown(socket.SHUT_WR)
+            server_socket.close()
+            ServerSetup()
+    #def startServer(self, widget, data = None)
+#class ServerSetup(gtk.Window)
+
+
+##############################################################################
+class ClientSetup(gtk.Window):
+    def __init__(self):
+        gtk.Window.__init__(self)
+        self.connect("delete-event", self.startMainMenu)
+        self.set_resizable(False)
+        self.set_title("Viking Chess Client Setup")
+        self.set_border_width(0)
+        self.set_position(gtk.WIN_POS_CENTER)
+        self.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
+
+        lblServerHost = gtk.Label("Server IP:")
+        self.entryServerHost = IPEntry()
+        self.entryServerHost.set_text("127.0.0.1")
+        hbox = gtk.HBox(True, 3)
+        hbox.pack_start(lblServerHost, False, False, 10)
+        hbox.pack_end(self.entryServerHost, False, False, 10)
+
+        lblServerPort = gtk.Label("Server Port:")
+        self.entryServerPort = NumberEntry()
+        self.entryServerPort.set_text(str(SERVER_PORT))
+        hbox2 = gtk.HBox(True, 3)
+        hbox2.pack_start(lblServerPort, False, False, 10)
+        hbox2.pack_end(self.entryServerPort, False, False, 10)
+
+        btStartServer = gtk.Button(label="Connect...")
+        btStartServer.connect("clicked", self.startClient, None)
+        hbox3 = gtk.HBox(True, 3)
+        hbox3.pack_start(btStartServer, False, False, 10)
+
+        vbox = gtk.VBox(False, 3)
+        vbox.pack_start(hbox, False, False, 5)
+        vbox.pack_start(hbox2, False, False, 5)
+        vbox.pack_start(hbox3, False, False, 5)
+        self.add(vbox)
+        self.show_all()
+
+    def startMainMenu(self, widget, data=None):
+        self.destroy()
+        MainWindow().show()
+
+    def startClient(self, widget, data = None):
+        # Get options
+        serverHost = self.entryServerHost.get_text()
+        serverPort = int("0" + self.entryServerPort.get_text())
+        if serverPort == 0:
+            serverPort = SERVER_PORT
+
+        self.destroy()
+
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            print "Connecting to server..."
+            client_socket.connect((serverHost, serverPort))
+            print "Connection established"
+            vc = VikingChessBoardOnline(False, client_socket)
+            vc.isServer = False
+            vc.startGame()
+        except socket.error:
+            showErrorDialog("Connection Error", "No server found. Try other address/port")
+            client_socket.close()
+            ClientSetup()
+        except OverflowError:
+            showErrorDialog("Wrong Port" ,"Port must be 0-65535")
+            client_socket.close()
+            ClientSetup()
+        except:
+            client_socket.shutdown(socket.SHUT_WR)
+            client_socket.close()
+            ClientSetup()
+    #def startClient(self, widget, data = None)
+#class ClientSetup(gtk.Window)
+
+##############################################################################
+# Helper functions
+class NumberEntry(gtk.Entry):
+    """ Allow only numbers in Entry box """
+    def __init__(self):
+        gtk.Entry.__init__(self)
+        self.connect('changed', self.on_changed)
+    def on_changed(self, *args):
+        text = self.get_text().strip()
+        self.set_text(''.join([i for i in text if i in '0123456789']))
+
+class IPEntry(NumberEntry):
+    """ Allow only numbers and dots in Entry box """
+    def on_changed(self, *args):
+        text = self.get_text().strip()
+        self.set_text(''.join([i for i in text if i in '0123456789.']))
+
+def showErrorDialog(title, message):
+    dialog = gtk.MessageDialog(None,
+            gtk.DIALOG_MODAL,
+            gtk.MESSAGE_ERROR,
+            gtk.BUTTONS_CLOSE,
+            message)
+    dialog.set_title(title)
+    dialog.run()
+    dialog.destroy()
+
+##############################################################################
 class VikingChessBoard(object):
-    def __init__(self, gameIndex):
+    def __init__(self, gameIndex = 0):
         self.gameIndex = gameIndex
         self.whiteCount = 0
+        self.winner = None
         self.mainWindow = mainWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
         mainWindow.connect("delete-event", self.onClose)
         mainWindow.set_keep_above(False)
         self.mainWindow.set_title("Viking Chess - White")
         mainWindow.set_resizable(False)
+        self.mainWindow.modify_bg(gtk.STATE_NORMAL, GDK_COLOR(WINDOW_BG_COLOR))
+
+        if 0 == gameIndex:
+            labelSize = 0
+        else:
+            labelSize = 16
 
         vboxBoard = gtk.VBox()
         hbox = [gtk.HBox() for x in xrange(BOARD_SIZE[self.gameIndex])]
@@ -200,12 +427,12 @@ class VikingChessBoard(object):
         [[hbox[y].pack_start(self.cell[x][BOARD_SIZE[self.gameIndex] - 1 - y]) for x in xrange(BOARD_SIZE[self.gameIndex])] for y in xrange(BOARD_SIZE[self.gameIndex])]
 
         # X axises from below and from above the board
-        hboxXAxisBelow = gtk.HBox()
+        hboxXAxisBelow = gtk.HBox(False, 1)
         xAxis = [gtk.Label(chr(ord('a') + x)) for x in xrange(BOARD_SIZE[self.gameIndex])]
-        [hboxXAxisBelow.pack_start(xAxis[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
-        hboxXAxisAbove = gtk.HBox()
+        [hboxXAxisBelow.pack_start(xAxis[x], True, True, labelSize) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        hboxXAxisAbove = gtk.HBox(False, 1)
         xAxis = [gtk.Label(chr(ord('a') + x)) for x in xrange(BOARD_SIZE[self.gameIndex])]
-        [hboxXAxisAbove.pack_start(xAxis[x]) for x in xrange(BOARD_SIZE[self.gameIndex])]
+        [hboxXAxisAbove.pack_start(xAxis[x], True, True, labelSize) for x in xrange(BOARD_SIZE[self.gameIndex])]
         # Y axises from the left and from the right of the board
         vboxYAxisLeft = gtk.VBox()
         yAxis = [gtk.Label(y + 1) for y in xrange(BOARD_SIZE[self.gameIndex])]
@@ -214,13 +441,14 @@ class VikingChessBoard(object):
         yAxis = [gtk.Label(y + 1) for y in xrange(BOARD_SIZE[self.gameIndex])]
         [vboxYAxisRight.pack_end(yAxis[y]) for y in xrange(BOARD_SIZE[self.gameIndex])]
         # Log text view
-        sw = gtk.ScrolledWindow()
+        self.sw = sw = gtk.ScrolledWindow()
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         textview = gtk.TextView()
         fontdesc = pango.FontDescription("monospace")
         textview.modify_font(fontdesc)
         textview.set_editable(False)
         self.textbuffer = textview.get_buffer()
+        self.textbuffer.connect('changed', self.scrollLog)
         sw.add(textview)
         sw.set_size_request(200, 50)
         sw.set_border_width(3)
@@ -247,6 +475,10 @@ class VikingChessBoard(object):
     def coordToText(self, x, y):
         return chr(ord('a') + x) + str(y + 1)
 
+    def scrollLog(self, widget, data=None):
+        adj = self.sw.get_vadjustment()
+        if adj is not None:
+            adj.set_value(adj.upper - adj.page_size)
     def logMessage(self, message):
         iter = self.textbuffer.get_end_iter()
         iter.backward_char()
@@ -280,8 +512,8 @@ class VikingChessBoard(object):
             return True
     #def onClose(self, widget, data=None)
 
-
     def startGame(self):
+        print "Game Started"
         self.mainWindow.show_all()
         self.clearLog()
         self.clearAllCells()
@@ -418,43 +650,7 @@ class VikingChessBoard(object):
                 self.selectedCell = cell
             else: # move the knight if possible
                 if self.selectedCell is not None and self.isValidMove(cell):
-                    self.logMove(self.whiteTurn, self.selectedCell, cell)
-                    if self.selectedCell.isWhite:
-                        cell.setWhite()
-                    elif self.selectedCell.isBlack:
-                        cell.setBlack()
-                    elif self.selectedCell.isBlackKing:
-                        cell.setBlackKing()
-                    cell.set_active(False)
-                    self.selectedCell.clear()
-                    if self.selectedCell.isThrone:
-                        # The king just moved from the Throne -
-                        # set special label to indicate the Throne
-                        self.selectedCell.set_label("X")
-                    self.selectedCell.set_active(False)
-                    self.checkKilledKnights(cell)
-                    self.checkClearCheck()
-                    # Always check whether anybody won the game after each move
-                    if not self.isGameOver():  # It's important not to switch turns before calling this function!
-                        self.whiteTurn = not self.whiteTurn # ...now it's safe
-                        whoseTurn = "White" if self.whiteTurn else "Black"
-                        self.mainWindow.set_title("Viking Chess - " + whoseTurn)
-                    else:
-                        self.mainWindow.set_title("Viking Chess - " + self.winner + " won!")
-                        winner = self.winner
-                        winnerDialog = gtk.MessageDialog(
-                            parent = None,
-                            flags = gtk.DIALOG_DESTROY_WITH_PARENT,
-                            type = gtk.MESSAGE_INFO,
-                            buttons = gtk.BUTTONS_OK,
-                            message_format = self.winner + " won!"
-                        )
-                        winnerDialog.set_title("Round complete!")
-                        winnerDialog.connect('response', lambda dialog, response: self.startGame())
-                        winnerDialog.set_position(gtk.WIN_POS_CENTER)
-                        winnerDialog.set_keep_above(True)
-                        winnerDialog.run()
-                        winnerDialog.destroy()
+                    self.performMove(self.selectedCell.x, self.selectedCell.y, cell.x, cell.y)
                 else:
                     cell.set_active(False)
         else:
@@ -507,6 +703,34 @@ class VikingChessBoard(object):
         # Otherwise the move is valid
         return True
 
+    def performMove(self, fromCellX, fromCellY, toCellX, toCellY):
+        fromCell = self.cell[fromCellX][fromCellY]
+        toCell = self.cell[toCellX][toCellY]
+        self.logMove(self.whiteTurn, fromCell, toCell)
+        if fromCell.isWhite:
+            toCell.setWhite()
+        elif fromCell.isBlack:
+            toCell.setBlack()
+        elif fromCell.isBlackKing:
+            toCell.setBlackKing()
+        toCell.set_active(False)
+        fromCell.clear()
+        if fromCell.isThrone:
+            # The king just moved from the Throne -
+            # set special label to indicate the Throne
+            fromCell.set_label("X")
+        fromCell.set_active(False)
+        self.checkKilledKnights(toCell)
+        self.checkClearCheck()
+        # Always check whether anybody won the game after each move
+        if not self.isGameOver():  # It's important not to switch turns before calling this function!
+            self.whiteTurn = not self.whiteTurn # ...now it's safe
+            whoseTurn = "White" if self.whiteTurn else "Black"
+            self.mainWindow.set_title("Viking Chess - " + whoseTurn)
+        else:
+            threading.Thread(target=self.showGameOverDialog).start()
+    #def performMove(self, fromCellX, fromCellY, toCellX, toCellY)
+
     def checkKilledKnights(self, curCell):
         # We need to check only the cross 5x5 with the center in the current cell:
         #    X
@@ -537,7 +761,7 @@ class VikingChessBoard(object):
                        0 == my or BOARD_SIZE[self.gameIndex] - 1 == my:
                         self.isCheck = True
                         self.logMessage(" Check!")
-                        self.showCheckWarn()
+#                        self.showCheckWarn()
                         continue
                     # This may be a check, usually it is, but we need to check 2 exclusions:
                     # 1. the king is on the throne and surrounded by white knights
@@ -553,7 +777,7 @@ class VikingChessBoard(object):
                         else:
                             self.isCheck = True
                             self.logMessage(" Check!")
-                            self.showCheckWarn()
+#                            self.showCheckWarn()
                             continue
                     else:
                         whiteCounts = 0
@@ -571,13 +795,13 @@ class VikingChessBoard(object):
                             if whiteCounts == 3:
                                 self.isCheck = True
                                 self.logMessage(" Check!")
-                                self.showCheckWarn()
+#                                self.showCheckWarn()
                                 continue
                         else:
                             # Throne is not nearby and the King is between 2 white knights -> it's check
                             self.isCheck = True
                             self.logMessage(" Check!")
-                            self.showCheckWarn()
+#                            self.showCheckWarn()
                             continue
                     #if cell[mx][my].isThrone
                 #elif cell[mx][my].isBlackKing
@@ -612,7 +836,7 @@ class VikingChessBoard(object):
             gtk.BUTTONS_CLOSE,
             "Black king is in check!\nYou have one move to rescue him!")
         dialog.set_title("King in check!")
-        response = dialog.run()
+        dialog.run()
         dialog.destroy()
 
     def checkClearCheck(self):
@@ -680,9 +904,143 @@ class VikingChessBoard(object):
                         return
         #if cell[kingX][kingY].isThrone
     #def checkClearCheck(self)
-#class VikingChess(object)
+
+    @idle_add_decorator
+    def showGameOverDialog(self):
+        winner = self.winner
+        self.mainWindow.set_title("Viking Chess - " + winner + " won!")
+        print "Game Over: " + winner + " won"
+        winnerDialog = gtk.MessageDialog(
+            parent = None,
+            flags = gtk.DIALOG_DESTROY_WITH_PARENT,
+            type = gtk.MESSAGE_INFO,
+            buttons = gtk.BUTTONS_YES_NO,
+            message_format = winner + " won!\n\nStart new game?"
+        )
+        winnerDialog.set_title("Round complete!")
+        winnerDialog.connect('response', self.gameOverDialogResponse)
+        winnerDialog.connect('close', self.gameOverDialogResponse)
+        winnerDialog.set_position(gtk.WIN_POS_CENTER)
+        winnerDialog.set_keep_above(True)
+        winnerDialog.show()
+    @idle_add_decorator
+    def gameOverDialogResponse(self, widget, response=None):
+        widget.destroy()
+        if response == gtk.RESPONSE_YES:
+            self.startGame()
+        else:
+            self.mainWindow.destroy()
+            MainWindow().show()
+#class VikingChessBoard(object)
 
 
+##############################################################################
+class VikingChessBoardOnline(VikingChessBoard):
+    def __init__(self, isServer, msocket, gameIndex=0):
+        self.isServer = isServer
+        self.msocket = msocket
+        self.gameIndex = gameIndex
+        self.isOn = False   # is the board is ready to receive data
+        if not self.isServer:
+            # Get game index from the server
+            self.gameIndex = int(self.msocket.recv(1024).strip())
+        VikingChessBoard.__init__(self, self.gameIndex)
+
+    def startGame(self):
+        self.isOn = True
+        VikingChessBoard.startGame(self)
+        if not self.isServer:
+            threading.Thread(target=self.wait_for_move).start()
+
+    # Override buttonClicked() according to client/server behaviour
+    # to send data about the move to the other player.
+    #
+    # Call performMove() on receiving the data from client/server
+    # to move the knight like the other player did.
+    def buttonClicked(self, cell, data=None):
+        if self.isServer and self.whiteTurn or\
+           not self.isServer and not self.whiteTurn:
+            if cell.get_active():
+                # Allow to select only the knights of player color
+                if (self.whiteTurn and cell.isWhite) or\
+                   (not self.whiteTurn and (cell.isBlack or cell.isBlackKing)): # choose the knight to move
+                    if self.selectedCell is not None and self.selectedCell != cell:
+                        self.selectedCell.set_active(False)
+                    self.selectedCell = cell
+                else: # move the knight if possible
+                    if self.selectedCell is not None and self.isValidMove(cell):
+                        to_send = str(self.selectedCell.x) + ":" + str(self.selectedCell.y) + ":" + str(cell.x) + ":" + str(cell.y) + "\n"
+                        self.msocket.send(to_send)
+                        self.performMove(self.selectedCell.x, self.selectedCell.y, cell.x, cell.y)
+                        if self.winner is None:
+                            threading.Thread(target=self.wait_for_move).start()
+                    else:
+                        cell.set_active(False)
+            else:
+                if self.selectedCell == cell:
+                    # Unselect current cell
+                    self.selectedCell = None
+        else:
+            cell.set_active(False)
+    #def buttonClicked(self, cell, data=None)
+
+    def wait_for_move(self):
+        data = self.msocket.recv(1024).strip()
+        if self.isOn:
+            if data == "Bye":
+                print "Partner disconnected"
+                threading.Thread(target=self.showDisconnectedDialog).start()
+            else:
+                from_cell_x, from_cell_y, to_cell_x, to_cell_y = data.split(':')
+                # Use idle_add to update GUI not from the main thread
+                gobject.idle_add(self.performMove, int(from_cell_x), int(from_cell_y), int(to_cell_x), int(to_cell_y))
+
+    def onClose(self, widget, data=None):
+        dialog = gtk.MessageDialog(self.mainWindow,
+            gtk.DIALOG_MODAL,
+            gtk.MESSAGE_INFO,
+            gtk.BUTTONS_YES_NO,
+            "Quit the game? It will discard all game progress.")
+        dialog.set_title("Confirm Quit")
+        response = dialog.run()
+        dialog.destroy()
+        if response == gtk.RESPONSE_YES:
+            print "Closing the Game. Disconnecting..."
+            self.isOn = False
+            self.msocket.send("Bye")
+            self.msocket.shutdown(socket.SHUT_WR)
+            self.msocket.close()
+            self.mainWindow.destroy()
+            MainWindow().show() # Show main menu on exit
+        else:
+            return True
+    #def onClose(self, widget, data=None)
+
+    @idle_add_decorator
+    def showDisconnectedDialog(self):
+        winnerDialog = gtk.MessageDialog(
+            parent = None,
+            flags = gtk.DIALOG_DESTROY_WITH_PARENT,
+            type = gtk.MESSAGE_INFO,
+            buttons = gtk.BUTTONS_OK,
+            message_format = "Sorry, try to reconnect and start over"
+        )
+        winnerDialog.set_title("Partner disconnected!")
+        winnerDialog.connect('response', self.disconnectedDialogResponse)
+        winnerDialog.connect('close', self.disconnectedDialogResponse)
+        winnerDialog.set_position(gtk.WIN_POS_CENTER)
+        winnerDialog.set_keep_above(True)
+        winnerDialog.show()
+    @idle_add_decorator
+    def disconnectedDialogResponse(self, widget, data=None):
+        widget.destroy()
+        self.mainWindow.destroy()
+        self.isOn = False
+        MainWindow().show() # Show main menu
+#class VikingChessBoardOnline(VikingChessBoard)
+
+
+##############################################################################
 class Cell(gtk.ToggleButton):
     def __init__(self, parent, x, y):
         gtk.ToggleButton.__init__(self)
@@ -718,7 +1076,6 @@ class Cell(gtk.ToggleButton):
         image.set_from_pixbuf(scaled_buf)
         self.set_image(image)
 
-
     def setBlack(self):
         self.set_label("")
         self.isWhite = False
@@ -729,7 +1086,6 @@ class Cell(gtk.ToggleButton):
         image = gtk.Image()
         image.set_from_pixbuf(scaled_buf)
         self.set_image(image)
-
 
     def setBlackKing(self):
         self.set_label("")
@@ -770,9 +1126,10 @@ class Cell(gtk.ToggleButton):
 
 ##############################################################################
 def main():
+    gtk.gdk.threads_enter()
     gtk.main()
+    gtk.gdk.threads_leave()
     return 0
-
 
 if __name__ == "__main__":
     MainWindow().show()
