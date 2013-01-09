@@ -273,13 +273,13 @@ class ServerSetup(gtk.Window):
             serverPort = SERVER_PORT
 
         self.destroy()
-        # starting the server waiting for cnnections
+        # starting the server waiting for connection
+        print "Starting Server"
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             server_socket.bind((SERVER_HOST, serverPort))
             server_socket.listen(1)
-            print "Start Server"
-            print "Waiting for a client to connect"
+            print "Waiting for a client to connect..."
             connection_socket, connection_addr = server_socket.accept()
             # Send game index to the client
             connection_socket.send(str(gameIndex))
@@ -351,7 +351,9 @@ class ClientSetup(gtk.Window):
 
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
+            print "Connecting to server..."
             client_socket.connect((serverHost, serverPort))
+            print "Connection established"
             vc = VikingChessBoardOnline(False, client_socket)
             vc.isServer = False
             vc.startGame()
@@ -511,6 +513,7 @@ class VikingChessBoard(object):
     #def onClose(self, widget, data=None)
 
     def startGame(self):
+        print "Game Started"
         self.mainWindow.show_all()
         self.clearLog()
         self.clearAllCells()
@@ -906,6 +909,7 @@ class VikingChessBoard(object):
     def showGameOverDialog(self):
         winner = self.winner
         self.mainWindow.set_title("Viking Chess - " + winner + " won!")
+        print "Game Over: " + winner + " won"
         winnerDialog = gtk.MessageDialog(
             parent = None,
             flags = gtk.DIALOG_DESTROY_WITH_PARENT,
@@ -933,7 +937,6 @@ class VikingChessBoard(object):
 ##############################################################################
 class VikingChessBoardOnline(VikingChessBoard):
     def __init__(self, isServer, msocket, gameIndex=0):
-        print "OnlineChess Server: " + str(isServer) + " Index = " + str(gameIndex)
         self.isServer = isServer
         self.msocket = msocket
         self.gameIndex = gameIndex
@@ -944,7 +947,6 @@ class VikingChessBoardOnline(VikingChessBoard):
         VikingChessBoard.__init__(self, self.gameIndex)
 
     def startGame(self):
-        print "New Game Started"
         self.isOn = True
         VikingChessBoard.startGame(self)
         if not self.isServer:
@@ -986,6 +988,7 @@ class VikingChessBoardOnline(VikingChessBoard):
         data = self.msocket.recv(1024).strip()
         if self.isOn:
             if data == "Bye":
+                print "Partner disconnected"
                 threading.Thread(target=self.showDisconnectedDialog).start()
             else:
                 from_cell_x, from_cell_y, to_cell_x, to_cell_y = data.split(':')
@@ -1002,6 +1005,7 @@ class VikingChessBoardOnline(VikingChessBoard):
         response = dialog.run()
         dialog.destroy()
         if response == gtk.RESPONSE_YES:
+            print "Closing the Game. Disconnecting..."
             self.isOn = False
             self.msocket.send("Bye")
             self.msocket.shutdown(socket.SHUT_WR)
