@@ -5,5 +5,5 @@ Package: viking-chess
 Architecture: all
 Description: Viking or Slavic Chess
 Depends: libgtk2.0-bin, python-gobject, python-gtk2
-Homepage: https://github.com/aikikode/viking_chess
+Homepage: http://aikikode.github.com/viking_chess
 Version: 0.1.0
