@@ -76,8 +76,14 @@ def get_icons_dir():
             return dir
     return ""
 
-ICONS_DIR = get_icons_dir()
+def get_readme():
+    for dir in ["./", "/usr/share/doc/viking-chess/"]:
+        if pygtk.os.path.isdir(dir) and pygtk.os.path.isfile(dir + "README.md"):
+            return dir + "README.md"
+    return None
 
+ICONS_DIR = get_icons_dir()
+README = get_readme()
 ##############################################################################
 class MainWindow(gtk.Window):
     """ Main window the user sees after application starts.
@@ -162,12 +168,12 @@ class MainWindow(gtk.Window):
 
         box2.pack_start(sw)
         # Load the file textview-basic.py into the text window
-        infile = open("README.md", "r")
-
-        if infile:
-            string = infile.read()
-            infile.close()
-            textbuffer.set_text(string)
+        if README is not None:
+            infile = open(README, "r")
+            if infile:
+                string = infile.read()
+                infile.close()
+                textbuffer.set_text(string)
         window.set_size_request(730, 550)
         window.set_position(gtk.WIN_POS_CENTER)
         window.show()
