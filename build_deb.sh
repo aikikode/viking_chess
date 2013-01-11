@@ -27,6 +27,7 @@ then
     cp ./icons/*.png    $BUILDDIR/usr/local/share/$APPNAME/media/
     cp $APPNAME.desktop $BUILDDIR/usr/share/applications/
     cp ./AUTHORS        $BUILDDIR/usr/share/doc/$APPNAME/
+    cp ./README.md      $BUILDDIR/usr/share/doc/$APPNAME/
     cp -r ./DEBIAN      $BUILDDIR/
 
     fakeroot dpkg-deb --build $BUILDDIR viking-chess-$VERSION.deb
