@@ -71,6 +71,7 @@ History and Rules
 -----------------
   In English:
 - http://hem.bredband.net/b512479/
+
   In Russian:
 - http://aagenielsen.dk/hnefatafl_rules_russian.html
 - http://vikings.fantasyland.info/tavlei.html

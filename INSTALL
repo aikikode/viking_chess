@@ -1,8 +1,31 @@
 INSTALLATION
 ============
 
-Currently deb-based system are supported.
-To install Viking Chess first run the following command:
+Dependencies
+------------
+- Python 2
+- PyGTK
+
+UNIX
+----
+Run viking-chess from current directory to run the application,
+no installation is needed.
+In case you want to install the game to the system follow
+these steps (currently deb-based system are supported):
 $ ./build_deb.sh
 It will create deb package in the current dir. Install it with:
 # dpkg -i <deb file>
+
+Windows
+-------
+The game doesn't need to be installed and can be run from the
+current directory. However the dependencies should be
+installed first:
+1. Install Python
+   Download and run installer for version 2 from
+   http://www.python.org/download/
+   currently the latest one is 2.7.3
+2. Install PyGTK
+   Go to http://www.pygtk.org/downloads.html and download
+   and run 'all-in-one installer'.
+3. Run viking-chess
