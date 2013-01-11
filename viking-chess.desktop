@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Viking Chess
+Comment=Viking or Slavic Chess Game
+GenericName=Viking Chess
+Categories=GNOME;Utility;
+Exec=viking-chess
+Icon=/usr/local/share/viking-chess/media/app_icon.png
+Hidden=False
+Type=Application

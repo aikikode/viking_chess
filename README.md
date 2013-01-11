@@ -36,7 +36,7 @@ How to attack a knight
   throne
 - Note, that if a knight itself moves to the 'under attack' position it
   is not killed
-- These's a special attack on the black knight defending the king: if a
+- There's a special attack on the black knight defending the king: if a
   black knight is between two white knights (it moved there itself so it's
   not killed) and it has a king from the 3-rd side, then it can be killed
   by a white knight that moves to it's 4-th side (so that it is now
@@ -47,7 +47,7 @@ How to attack the king
 ----------------------
 - If the king is in the throne it need to be surrounded from all 4 sides
   to be defeated
-- If the king is near the throne (it's a neighbour cell) then it should
+- If the king is near the throne (it's a neighbor cell) then it should
   be surrounded from all other 3 sides to be defeated
 - In all other situations it should be placed between two other knights
 

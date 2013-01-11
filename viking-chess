@@ -70,6 +70,14 @@ def idle_add_decorator(func):
         gobject.idle_add(func, *args)
     return callback
 
+def get_icons_dir():
+    for dir in ["./icons", "./ico", "/usr/local/share/viking-chess/media/"]:
+        if pygtk.os.path.isdir(dir):
+            return dir
+    return None
+
+ICONS_DIR = get_icons_dir()
+
 ##############################################################################
 class MainWindow(gtk.Window):
     """ Main window the user sees after application starts.
@@ -1070,7 +1078,7 @@ class Cell(gtk.ToggleButton):
         self.isWhite = True
         self.isBlack = False
         self.isBlackKing = False
-        pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/white_knight.png")
+        pixbuf = gtk.gdk.pixbuf_new_from_file(ICONS_DIR + "/white_knight.png")
         scaled_buf = pixbuf.scale_simple(30,30,gtk.gdk.INTERP_BILINEAR)
         image = gtk.Image()
         image.set_from_pixbuf(scaled_buf)
@@ -1081,7 +1089,7 @@ class Cell(gtk.ToggleButton):
         self.isWhite = False
         self.isBlack = True
         self.isBlackKing = False
-        pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/black_knight.png")
+        pixbuf = gtk.gdk.pixbuf_new_from_file(ICONS_DIR + "/black_knight.png")
         scaled_buf = pixbuf.scale_simple(30,30,gtk.gdk.INTERP_BILINEAR)
         image = gtk.Image()
         image.set_from_pixbuf(scaled_buf)
@@ -1094,7 +1102,7 @@ class Cell(gtk.ToggleButton):
         self.isBlackKing = True
         self.mainWindow.kingX = self.x
         self.mainWindow.kingY = self.y
-        pixbuf = gtk.gdk.pixbuf_new_from_file("./ico/black_king.png")
+        pixbuf = gtk.gdk.pixbuf_new_from_file(ICONS_DIR + "/black_king.png")
         scaled_buf = pixbuf.scale_simple(30,30,gtk.gdk.INTERP_BILINEAR)
         image = gtk.Image()
         image.set_from_pixbuf(scaled_buf)
