@@ -1,6 +1,10 @@
 Viking or Slavic Chess
 ======================
 
+Viking Chess is an ancient board game invented by the Vikings more than
+thousand years ago. The game represents a small group of knights defending
+their king from a larger group of warriors.
+
 Target
 ------
 Black knights defend their king (it is located in the central cell - 'throne')
@@ -63,8 +67,15 @@ Game types
  - 13 x 13 - Hnefatafl (also Halatafl, Tanntafl)
    The king need to reach any border cell (except white fortress cells)
 
-History and Rules (in Russian)
-------------------------------
+History and Rules
+-----------------
+  In English:
+- http://hem.bredband.net/b512479/
+  In Russian:
 - http://aagenielsen.dk/hnefatafl_rules_russian.html
 - http://vikings.fantasyland.info/tavlei.html
 - http://skyruk.livejournal.com/246910.html
+
+Inspired by M.Zadornov (http://www.zadornov.net/)
+-------------------------------------------------
+
